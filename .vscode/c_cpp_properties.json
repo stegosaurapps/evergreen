@@ -4,7 +4,7 @@
       "name": "Win32",
       "includePath": [
         "${workspaceFolder}/**",
-        "C:/Users/bonha/Documents/vcpkg-master/installed/x64-windows/include"
+        "C:/VulkanSDK/1.4.335.0/Include"
       ],
       "defines": [],
       "windowsSdkVersion": "10.0.19041.0",

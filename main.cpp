@@ -1,82 +1,216 @@
-#include <iostream>
-#include <cstring>
-#include <cstdint>
-
-#include <GLFW/glfw3.h>
-
-#define GLM_ENABLE_EXPERIMENTAL
-
-#include <glm/glm.hpp>
-#include <glm/gtx/string_cast.hpp>
-
-#include "engine/engine.hpp"
-
-// Example resolution
-const int WIDTH = 800;
-const int HEIGHT = 600;
-
-#ifndef GL_UNSIGNED_INT_8_8_8_8_REV
-#define GL_UNSIGNED_INT_8_8_8_8_REV 0x8367
+#ifndef VK_USE_PLATFORM_WIN32_KHR
+#define VK_USE_PLATFORM_WIN32_KHR
 #endif
 
-// RGBA pixel buffer, 4 bytes per pixel
-uint32_t framebuffer[WIDTH * HEIGHT];
+#define SDL_MAIN_HANDLED
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_properties.h>
 
-int main() {
-    std::cout << "Test..." << std::endl;
+#include <vulkan/vulkan.h>
 
-    glm::vec3 myVector(1.0f, 2.0f, 3.0f);
+#include <windows.h>
+#include <iostream>
+#include <vector>
+#include <string>
 
-    Engine engine;
+static const char* VkResultToString(VkResult r)
+{
+    switch (r) {
+    case VK_SUCCESS: return "VK_SUCCESS";
+    case VK_ERROR_INITIALIZATION_FAILED: return "VK_ERROR_INITIALIZATION_FAILED";
+    case VK_ERROR_LAYER_NOT_PRESENT: return "VK_ERROR_LAYER_NOT_PRESENT";
+    case VK_ERROR_EXTENSION_NOT_PRESENT: return "VK_ERROR_EXTENSION_NOT_PRESENT";
+    case VK_ERROR_INCOMPATIBLE_DRIVER: return "VK_ERROR_INCOMPATIBLE_DRIVER";
+    default: return "VK_RESULT_(unhandled)";
+    }
+}
 
-    engine.Init();
-    engine.Run();
-    engine.Shutdown();
-
-    if (!glfwInit()) {
-        std::cerr << "GLFW init failed!" << std::endl;
-        return -1;
+static void DumpAvailableInstanceExtensions()
+{
+    uint32_t count = 0;
+    VkResult r = vkEnumerateInstanceExtensionProperties(nullptr, &count, nullptr);
+    if (r != VK_SUCCESS) {
+        std::cout << "vkEnumerateInstanceExtensionProperties failed: "
+                  << VkResultToString(r) << " (" << (int)r << ")\n";
+        return;
     }
 
-    // Clear screen to black
-    std::memset(framebuffer, 0, sizeof(framebuffer));
+    std::vector<VkExtensionProperties> exts(count);
+    r = vkEnumerateInstanceExtensionProperties(nullptr, &count, exts.data());
+    if (r != VK_SUCCESS) {
+        std::cout << "vkEnumerateInstanceExtensionProperties (2) failed: "
+                  << VkResultToString(r) << " (" << (int)r << ")\n";
+        return;
+    }
 
-    // Draw red pixel at center
-    int centerX = WIDTH / 2;
-    int centerY = HEIGHT / 2;
-    framebuffer[centerY * WIDTH + centerX] = 0xFF0000FF; // RGBA: Red
+    std::cout << "Available instance extensions (" << count << "):\n";
+    for (const auto& e : exts) {
+        std::cout << "  " << e.extensionName << " (spec " << e.specVersion << ")\n";
+    }
+}
 
-    GLFWwindow* window = glfwCreateWindow(800, 600, "evergreen", nullptr, nullptr);
+static void DumpAvailableLayers()
+{
+    uint32_t count = 0;
+    VkResult r = vkEnumerateInstanceLayerProperties(&count, nullptr);
+    if (r != VK_SUCCESS) {
+        std::cout << "vkEnumerateInstanceLayerProperties failed: "
+                  << VkResultToString(r) << " (" << (int)r << ")\n";
+        return;
+    }
+
+    std::vector<VkLayerProperties> layers(count);
+    r = vkEnumerateInstanceLayerProperties(&count, layers.data());
+    if (r != VK_SUCCESS) {
+        std::cout << "vkEnumerateInstanceLayerProperties (2) failed: "
+                  << VkResultToString(r) << " (" << (int)r << ")\n";
+        return;
+    }
+
+    std::cout << "Available layers (" << count << "):\n";
+    for (const auto& l : layers) {
+        std::cout << "  " << l.layerName
+                  << " (spec " << l.specVersion
+                  << ", impl " << l.implementationVersion << ")\n";
+    }
+}
+
+int main(int, char**)
+{
+    std::cout << "evergreen: SDL3 + Vulkan bootstrap\n";
+
+    if (!SDL_Init(SDL_INIT_VIDEO)) {
+        std::cerr << "SDL_Init failed: " << SDL_GetError() << "\n";
+        return 1;
+    }
+
+    SDL_Window* window = SDL_CreateWindow(
+        "evergreen",
+        800, 600,
+        SDL_WINDOW_RESIZABLE | SDL_WINDOW_VULKAN
+    );
+
     if (!window) {
-        std::cerr << "Window creation failed!" << std::endl;
-        glfwTerminate();
-        return -1;
+        std::cerr << "SDL_CreateWindow failed: " << SDL_GetError() << "\n";
+        SDL_Quit();
+        return 1;
     }
 
-    glfwMakeContextCurrent(window);
+    DumpAvailableInstanceExtensions();
+    DumpAvailableLayers();
 
-    while (!glfwWindowShouldClose(window)) {
-        // Clear framebuffer
-        std::memset(framebuffer, 0, sizeof(framebuffer));
+    std::vector<const char*> instanceExts = {
+        VK_KHR_SURFACE_EXTENSION_NAME,
+        VK_KHR_WIN32_SURFACE_EXTENSION_NAME
+    };
 
-        // Draw red pixel in center
-        int centerX = WIDTH / 2;
-        int centerY = HEIGHT / 2;
-        framebuffer[centerY * WIDTH + centerX] = 0xFF0000FF; // RGBA
+    VkApplicationInfo appInfo{};
+    appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    appInfo.pApplicationName = "evergreen";
+    appInfo.applicationVersion = VK_MAKE_VERSION(0, 1, 0);
+    appInfo.pEngineName = "evergreen";
+    appInfo.engineVersion = VK_MAKE_VERSION(0, 1, 0);
+    appInfo.apiVersion = VK_API_VERSION_1_3;
 
-        // Draw it to screen
-        glClear(GL_COLOR_BUFFER_BIT);
-        glDrawPixels(WIDTH, HEIGHT, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8_REV, framebuffer);
+    VkInstanceCreateInfo ci{};
+    ci.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+    ci.pApplicationInfo = &appInfo;
+    ci.enabledExtensionCount = (uint32_t)instanceExts.size();
+    ci.ppEnabledExtensionNames = instanceExts.data();
 
-        glfwSwapBuffers(window);
-        glfwPollEvents();
+    std::cout << "Creating VkInstance with extensions:\n";
+    for (auto* e : instanceExts) std::cout << "  " << e << "\n";
+
+    VkInstance instance = VK_NULL_HANDLE;
+    VkResult r = vkCreateInstance(&ci, nullptr, &instance);
+    std::cout << "vkCreateInstance -> " << VkResultToString(r) << " (" << (int)r << ")\n";
+
+    if (r != VK_SUCCESS || instance == VK_NULL_HANDLE) {
+        std::cerr << "vkCreateInstance failed.\n";
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        return 1;
     }
 
-    glfwDestroyWindow(window);
-    glfwTerminate();
+    // --- SDL3 Win32 handles via properties ---
+    SDL_PropertiesID props = SDL_GetWindowProperties(window);
+    if (!props) {
+        std::cerr << "SDL_GetWindowProperties failed: " << SDL_GetError() << "\n";
+        vkDestroyInstance(instance, nullptr);
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        return 1;
+    }
 
+    HWND hwnd = (HWND)SDL_GetPointerProperty(props, "SDL.window.win32.hwnd", nullptr);
+    HINSTANCE hinstance = (HINSTANCE)SDL_GetPointerProperty(props, "SDL.window.win32.hinstance", nullptr);
 
-    std::cout << glm::to_string(myVector) << std::endl;
+    // Fallbacks: SDL3 sometimes doesn't provide hinstance.
+    if (hwnd && !hinstance) {
+        hinstance = (HINSTANCE)(intptr_t)GetWindowLongPtr(hwnd, GWLP_HINSTANCE);
+    }
+    if (!hinstance) {
+        hinstance = GetModuleHandle(nullptr);
+    }
 
+    if (!hwnd || !hinstance) {
+        std::cerr << "Failed to retrieve Win32 handles.\n";
+        std::cerr << "hwnd=" << hwnd << " hinstance=" << hinstance << "\n";
+        vkDestroyInstance(instance, nullptr);
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        return 1;
+    }
+
+    std::cout << "Win32 handles OK: hwnd=" << hwnd << " hinstance=" << hinstance << "\n";
+
+    // --- Create Win32 Vulkan surface ---
+    auto pfnCreateWin32Surface =
+        (PFN_vkCreateWin32SurfaceKHR)vkGetInstanceProcAddr(instance, "vkCreateWin32SurfaceKHR");
+
+    if (!pfnCreateWin32Surface) {
+        std::cerr << "vkCreateWin32SurfaceKHR not found.\n";
+        vkDestroyInstance(instance, nullptr);
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        return 1;
+    }
+
+    VkWin32SurfaceCreateInfoKHR sci{};
+    sci.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+    sci.hwnd = hwnd;
+    sci.hinstance = hinstance;
+
+    VkSurfaceKHR surface = VK_NULL_HANDLE;
+    r = pfnCreateWin32Surface(instance, &sci, nullptr, &surface);
+    std::cout << "vkCreateWin32SurfaceKHR -> " << VkResultToString(r) << " (" << (int)r << ")\n";
+
+    if (r != VK_SUCCESS || surface == VK_NULL_HANDLE) {
+        std::cerr << "Surface creation failed.\n";
+        vkDestroyInstance(instance, nullptr);
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        return 1;
+    }
+
+    std::cout << "Success: instance + surface created. Entering loop...\n";
+
+    bool running = true;
+    while (running) {
+        SDL_Event e;
+        while (SDL_PollEvent(&e)) {
+            if (e.type == SDL_EVENT_QUIT) running = false;
+            if (e.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED) running = false;
+        }
+        SDL_Delay(16);
+    }
+
+    vkDestroySurfaceKHR(instance, surface, nullptr);
+    vkDestroyInstance(instance, nullptr);
+
+    SDL_DestroyWindow(window);
+    SDL_Quit();
+
+    std::cout << "Clean shutdown.\n";
     return 0;
 }
