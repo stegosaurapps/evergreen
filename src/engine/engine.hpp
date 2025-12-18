@@ -1,14 +1,21 @@
 #pragma once
 
+#include "Renderer.hpp"
+#include "Window.hpp"
+
 class Engine {
 public:
-    Engine();
-    ~Engine();
+  Engine() = default;
+  ~Engine();
 
-    void Init();
-    void Run();
-    void Shutdown();
+  Engine(const Engine &) = delete;
+  Engine &operator=(const Engine &) = delete;
+
+  bool init();
+  int run();
+  void shutdown();
 
 private:
-    bool isRunning;
+  Window m_window;
+  Renderer m_renderer;
 };

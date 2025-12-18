@@ -1,29 +1,56 @@
+#include "Engine.hpp"
+
 #include <iostream>
 
-#include "engine.hpp"
+Engine::~Engine() { shutdown(); }
 
-Engine::Engine() : isRunning(false) {
-    std::cout << "[Engine] Constructor called.\n";
+bool Engine::init() {
+  const int startW = 800;
+  const int startH = 600;
+
+  if (!m_window.init("evergreen", startW, startH)) {
+    return false;
+  }
+
+  auto wh = m_window.win32Handles();
+  if (!wh.hwnd || !wh.hinstance) {
+    std::cerr << "Engine: failed to get Win32 handles.\n";
+    return false;
+  }
+
+  bool enableValidation =
+#if defined(_DEBUG)
+      true;
+#else
+      false;
+#endif
+
+  if (!m_renderer.init(wh, startW, startH, enableValidation)) {
+    std::cerr << "Engine: renderer init failed.\n";
+    return false;
+  }
+
+  return true;
 }
 
-Engine::~Engine() {
-    std::cout << "[Engine] Destructor called.\n";
-}
+int Engine::run() {
+  bool running = true;
+  while (running) {
+    running = m_window.pumpEvents();
 
-void Engine::Init() {
-    std::cout << "[Engine] Initialization...\n";
-    isRunning = true;
-}
-
-void Engine::Run() {
-    std::cout << "[Engine] Running...\n";
-    while (isRunning) {
-        // Placeholder: Main loop content here
-        isRunning = false; // Temporary: exit after one frame
+    if (m_window.wasResized()) {
+      m_renderer.onResize(m_window.width(), m_window.height());
+      m_window.clearResizedFlag();
     }
+
+    m_renderer.drawFrame();
+  }
+
+  return 0;
 }
 
-void Engine::Shutdown() {
-    std::cout << "[Engine] Shutting down.\n";
-    isRunning = false;
+void Engine::shutdown() {
+  // Renderer depends on window surface, so renderer down first.
+  m_renderer.shutdown();
+  m_window.shutdown();
 }
