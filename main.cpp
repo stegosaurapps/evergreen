@@ -6,87 +6,51 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_properties.h>
 
-#include <vulkan/vulkan.h>
-
 #include <windows.h>
 #include <iostream>
-#include <vector>
-#include <string>
 
-static const char* VkResultToString(VkResult r)
+#include "src/engine/rendering/renderer.hpp"
+
+static Win32WindowHandles GetWin32Handles(SDL_Window* window)
 {
-    switch (r) {
-    case VK_SUCCESS: return "VK_SUCCESS";
-    case VK_ERROR_INITIALIZATION_FAILED: return "VK_ERROR_INITIALIZATION_FAILED";
-    case VK_ERROR_LAYER_NOT_PRESENT: return "VK_ERROR_LAYER_NOT_PRESENT";
-    case VK_ERROR_EXTENSION_NOT_PRESENT: return "VK_ERROR_EXTENSION_NOT_PRESENT";
-    case VK_ERROR_INCOMPATIBLE_DRIVER: return "VK_ERROR_INCOMPATIBLE_DRIVER";
-    default: return "VK_RESULT_(unhandled)";
-    }
-}
-
-static void DumpAvailableInstanceExtensions()
-{
-    uint32_t count = 0;
-    VkResult r = vkEnumerateInstanceExtensionProperties(nullptr, &count, nullptr);
-    if (r != VK_SUCCESS) {
-        std::cout << "vkEnumerateInstanceExtensionProperties failed: "
-                  << VkResultToString(r) << " (" << (int)r << ")\n";
-        return;
+    Win32WindowHandles wh{};
+    SDL_PropertiesID props = SDL_GetWindowProperties(window);
+    if (!props) {
+        std::cerr << "SDL_GetWindowProperties failed: " << SDL_GetError() << "\n";
+        return wh;
     }
 
-    std::vector<VkExtensionProperties> exts(count);
-    r = vkEnumerateInstanceExtensionProperties(nullptr, &count, exts.data());
-    if (r != VK_SUCCESS) {
-        std::cout << "vkEnumerateInstanceExtensionProperties (2) failed: "
-                  << VkResultToString(r) << " (" << (int)r << ")\n";
-        return;
+    HWND hwnd = (HWND)SDL_GetPointerProperty(props, "SDL.window.win32.hwnd", nullptr);
+    HINSTANCE hinstance = (HINSTANCE)SDL_GetPointerProperty(props, "SDL.window.win32.hinstance", nullptr);
+
+    // SDL3 sometimes doesn't provide hinstance. Recover it.
+    if (hwnd && !hinstance) {
+        hinstance = (HINSTANCE)(intptr_t)GetWindowLongPtr(hwnd, GWLP_HINSTANCE);
+    }
+    if (!hinstance) {
+        hinstance = GetModuleHandle(nullptr);
     }
 
-    std::cout << "Available instance extensions (" << count << "):\n";
-    for (const auto& e : exts) {
-        std::cout << "  " << e.extensionName << " (spec " << e.specVersion << ")\n";
-    }
-}
-
-static void DumpAvailableLayers()
-{
-    uint32_t count = 0;
-    VkResult r = vkEnumerateInstanceLayerProperties(&count, nullptr);
-    if (r != VK_SUCCESS) {
-        std::cout << "vkEnumerateInstanceLayerProperties failed: "
-                  << VkResultToString(r) << " (" << (int)r << ")\n";
-        return;
-    }
-
-    std::vector<VkLayerProperties> layers(count);
-    r = vkEnumerateInstanceLayerProperties(&count, layers.data());
-    if (r != VK_SUCCESS) {
-        std::cout << "vkEnumerateInstanceLayerProperties (2) failed: "
-                  << VkResultToString(r) << " (" << (int)r << ")\n";
-        return;
-    }
-
-    std::cout << "Available layers (" << count << "):\n";
-    for (const auto& l : layers) {
-        std::cout << "  " << l.layerName
-                  << " (spec " << l.specVersion
-                  << ", impl " << l.implementationVersion << ")\n";
-    }
+    wh.hwnd = hwnd;
+    wh.hinstance = hinstance;
+    return wh;
 }
 
 int main(int, char**)
 {
-    std::cout << "evergreen: SDL3 + Vulkan bootstrap\n";
+    std::cout << "evergreen: SDL3 + Renderer\n";
 
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         std::cerr << "SDL_Init failed: " << SDL_GetError() << "\n";
         return 1;
     }
 
+    const int startW = 800;
+    const int startH = 600;
+
     SDL_Window* window = SDL_CreateWindow(
         "evergreen",
-        800, 600,
+        startW, startH,
         SDL_WINDOW_RESIZABLE | SDL_WINDOW_VULKAN
     );
 
@@ -96,117 +60,63 @@ int main(int, char**)
         return 1;
     }
 
-    DumpAvailableInstanceExtensions();
-    DumpAvailableLayers();
-
-    std::vector<const char*> instanceExts = {
-        VK_KHR_SURFACE_EXTENSION_NAME,
-        VK_KHR_WIN32_SURFACE_EXTENSION_NAME
-    };
-
-    VkApplicationInfo appInfo{};
-    appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-    appInfo.pApplicationName = "evergreen";
-    appInfo.applicationVersion = VK_MAKE_VERSION(0, 1, 0);
-    appInfo.pEngineName = "evergreen";
-    appInfo.engineVersion = VK_MAKE_VERSION(0, 1, 0);
-    appInfo.apiVersion = VK_API_VERSION_1_3;
-
-    VkInstanceCreateInfo ci{};
-    ci.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-    ci.pApplicationInfo = &appInfo;
-    ci.enabledExtensionCount = (uint32_t)instanceExts.size();
-    ci.ppEnabledExtensionNames = instanceExts.data();
-
-    std::cout << "Creating VkInstance with extensions:\n";
-    for (auto* e : instanceExts) std::cout << "  " << e << "\n";
-
-    VkInstance instance = VK_NULL_HANDLE;
-    VkResult r = vkCreateInstance(&ci, nullptr, &instance);
-    std::cout << "vkCreateInstance -> " << VkResultToString(r) << " (" << (int)r << ")\n";
-
-    if (r != VK_SUCCESS || instance == VK_NULL_HANDLE) {
-        std::cerr << "vkCreateInstance failed.\n";
-        SDL_DestroyWindow(window);
-        SDL_Quit();
-        return 1;
-    }
-
-    // --- SDL3 Win32 handles via properties ---
-    SDL_PropertiesID props = SDL_GetWindowProperties(window);
-    if (!props) {
-        std::cerr << "SDL_GetWindowProperties failed: " << SDL_GetError() << "\n";
-        vkDestroyInstance(instance, nullptr);
-        SDL_DestroyWindow(window);
-        SDL_Quit();
-        return 1;
-    }
-
-    HWND hwnd = (HWND)SDL_GetPointerProperty(props, "SDL.window.win32.hwnd", nullptr);
-    HINSTANCE hinstance = (HINSTANCE)SDL_GetPointerProperty(props, "SDL.window.win32.hinstance", nullptr);
-
-    // Fallbacks: SDL3 sometimes doesn't provide hinstance.
-    if (hwnd && !hinstance) {
-        hinstance = (HINSTANCE)(intptr_t)GetWindowLongPtr(hwnd, GWLP_HINSTANCE);
-    }
-    if (!hinstance) {
-        hinstance = GetModuleHandle(nullptr);
-    }
-
-    if (!hwnd || !hinstance) {
+    Win32WindowHandles wh = GetWin32Handles(window);
+    if (!wh.hwnd || !wh.hinstance) {
         std::cerr << "Failed to retrieve Win32 handles.\n";
-        std::cerr << "hwnd=" << hwnd << " hinstance=" << hinstance << "\n";
-        vkDestroyInstance(instance, nullptr);
         SDL_DestroyWindow(window);
         SDL_Quit();
         return 1;
     }
 
-    std::cout << "Win32 handles OK: hwnd=" << hwnd << " hinstance=" << hinstance << "\n";
+    // If you want Debug-only validation:
+    bool enableValidation =
+    #if defined(_DEBUG)
+        true;
+    #else
+        false;
+    #endif
 
-    // --- Create Win32 Vulkan surface ---
-    auto pfnCreateWin32Surface =
-        (PFN_vkCreateWin32SurfaceKHR)vkGetInstanceProcAddr(instance, "vkCreateWin32SurfaceKHR");
-
-    if (!pfnCreateWin32Surface) {
-        std::cerr << "vkCreateWin32SurfaceKHR not found.\n";
-        vkDestroyInstance(instance, nullptr);
+    Renderer renderer;
+    if (!renderer.init(wh, startW, startH, enableValidation)) {
+        std::cerr << "Renderer init failed.\n";
         SDL_DestroyWindow(window);
         SDL_Quit();
         return 1;
     }
-
-    VkWin32SurfaceCreateInfoKHR sci{};
-    sci.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
-    sci.hwnd = hwnd;
-    sci.hinstance = hinstance;
-
-    VkSurfaceKHR surface = VK_NULL_HANDLE;
-    r = pfnCreateWin32Surface(instance, &sci, nullptr, &surface);
-    std::cout << "vkCreateWin32SurfaceKHR -> " << VkResultToString(r) << " (" << (int)r << ")\n";
-
-    if (r != VK_SUCCESS || surface == VK_NULL_HANDLE) {
-        std::cerr << "Surface creation failed.\n";
-        vkDestroyInstance(instance, nullptr);
-        SDL_DestroyWindow(window);
-        SDL_Quit();
-        return 1;
-    }
-
-    std::cout << "Success: instance + surface created. Entering loop...\n";
 
     bool running = true;
     while (running) {
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
-            if (e.type == SDL_EVENT_QUIT) running = false;
-            if (e.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED) running = false;
+            switch (e.type) {
+            case SDL_EVENT_QUIT:
+            case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+                running = false;
+                break;
+
+            // SDL3 resize events you’ll commonly see:
+            case SDL_EVENT_WINDOW_RESIZED:
+            case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+            {
+                // data1/data2 are the new size for these events
+                int w = e.window.data1;
+                int h = e.window.data2;
+                if (w > 0 && h > 0) {
+                    renderer.onResize(w, h);
+                }
+            } break;
+
+            default:
+                break;
+            }
         }
-        SDL_Delay(16);
+
+        renderer.drawFrame();
+        // No SDL_Delay needed; vsync via FIFO present mode will pace you.
+        // If you later use MAILBOX or IMMEDIATE, consider adding a tiny delay.
     }
 
-    vkDestroySurfaceKHR(instance, surface, nullptr);
-    vkDestroyInstance(instance, nullptr);
+    renderer.shutdown();
 
     SDL_DestroyWindow(window);
     SDL_Quit();
