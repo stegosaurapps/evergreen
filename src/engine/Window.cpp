@@ -66,12 +66,14 @@ bool Window::pumpEvents() {
 Win32WindowHandles Window::win32Handles() const {
   Win32WindowHandles wh{};
 
-  if (!m_window)
+  if (!m_window) {
     return wh;
+  }
 
   SDL_PropertiesID props = SDL_GetWindowProperties(m_window);
   if (!props) {
     std::cerr << "SDL_GetWindowProperties failed: " << SDL_GetError() << "\n";
+
     return wh;
   }
 
@@ -89,5 +91,6 @@ Win32WindowHandles Window::win32Handles() const {
 
   wh.hwnd = hwnd;
   wh.hinstance = hinstance;
+
   return wh;
 }

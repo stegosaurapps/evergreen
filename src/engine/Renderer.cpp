@@ -120,8 +120,9 @@ ChooseSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &formats) {
   // Prefer SRGB if available.
   for (auto &f : formats) {
     if (f.format == VK_FORMAT_B8G8R8A8_SRGB &&
-        f.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+        f.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
       return f;
+    }
   }
 
   // Else: first available.
@@ -134,8 +135,9 @@ static VkPresentModeKHR
 ChoosePresentMode(const std::vector<VkPresentModeKHR> &modes) {
   // Mailbox feels great if available; else FIFO (guaranteed).
   for (auto m : modes) {
-    if (m == VK_PRESENT_MODE_MAILBOX_KHR)
+    if (m == VK_PRESENT_MODE_MAILBOX_KHR) {
       return m;
+    }
   }
 
   return VK_PRESENT_MODE_FIFO_KHR;
@@ -164,6 +166,7 @@ bool Renderer::init(const Win32WindowHandles &wh, int width, int height,
   m_width = width;
   m_height = height;
 
+  // Instance, surface and device setup
   if (!createInstance()) {
     return false;
   }
@@ -173,45 +176,62 @@ bool Renderer::init(const Win32WindowHandles &wh, int width, int height,
   if (!createSurface(wh)) {
     return false;
   }
-  if (!pickPhysicalDevice())
+  if (!pickPhysicalDevice()) {
     return false;
-  if (!createDevice())
+  }
+  if (!createDevice()) {
     return false;
+  }
 
-  if (!createSwapchain(width, height))
+  // Swapchain, render pass and frame buffer setup
+  if (!createSwapchain(width, height)) {
     return false;
-  if (!createSwapchainViews())
+  }
+  if (!createSwapchainViews()) {
     return false;
-  if (!createRenderPass())
+  }
+  if (!createRenderPass()) {
     return false;
-  if (!createFramebuffers())
+  }
+  if (!createFramebuffers()) {
     return false;
+  }
 
-  if (!createCommandPool())
+  // Command pool, command buffers and sync object setup
+  if (!createCommandPool()) {
     return false;
-  if (!createCommandBuffers())
+  }
+  if (!createCommandBuffers()) {
     return false;
-  if (!createSyncObjects())
+  }
+  if (!createSyncObjects()) {
     return false;
+  }
 
   std::cout << "Renderer init OK.\n";
+
   return true;
 }
 
 void Renderer::shutdown() {
-  if (!m_device && !m_instance)
+  if (!m_device && !m_instance) {
     return; // already down
+  }
 
   waitDeviceIdle();
 
   // Per-frame sync
   for (int i = 0; i < kFramesInFlight; ++i) {
-    if (m_imageAvailable[i])
+    if (m_imageAvailable[i]) {
       vkDestroySemaphore(m_device, m_imageAvailable[i], nullptr);
-    if (m_renderFinished[i])
+    }
+    if (m_renderFinished[i]) {
       vkDestroySemaphore(m_device, m_renderFinished[i], nullptr);
-    if (m_inFlight[i])
+    }
+    if (m_inFlight[i]) {
       vkDestroyFence(m_device, m_inFlight[i], nullptr);
+    }
+
     m_imageAvailable[i] = VK_NULL_HANDLE;
     m_renderFinished[i] = VK_NULL_HANDLE;
     m_inFlight[i] = VK_NULL_HANDLE;
@@ -238,8 +258,10 @@ void Renderer::shutdown() {
     auto pfnDestroy =
         (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
             m_instance, "vkDestroyDebugUtilsMessengerEXT");
-    if (pfnDestroy)
+    if (pfnDestroy) {
       pfnDestroy(m_instance, m_debugMessenger, nullptr);
+    }
+
     m_debugMessenger = VK_NULL_HANDLE;
   }
 
@@ -277,13 +299,16 @@ bool Renderer::createInstance() {
     if (!CheckInstanceExtensionAvailable(VK_EXT_DEBUG_UTILS_EXTENSION_NAME)) {
       std::cerr << "Missing instance extension: "
                 << VK_EXT_DEBUG_UTILS_EXTENSION_NAME << "\n";
+
       return false;
     }
+
     exts.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 
     if (!CheckInstanceLayerAvailable(kValidationLayer)) {
       std::cerr << "Validation requested but layer not available: "
                 << kValidationLayer << "\n";
+
       return false;
     }
   }
@@ -313,18 +338,21 @@ bool Renderer::createInstance() {
     std::cerr << "vkCreateInstance failed: " << (int)r << "\n";
     return false;
   }
+
   return true;
 }
 
 bool Renderer::setupDebug() {
-  if (!m_enableValidation)
+  if (!m_enableValidation) {
     return true;
+  }
 
   auto pfnCreate = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
       m_instance, "vkCreateDebugUtilsMessengerEXT");
 
   if (!pfnCreate) {
     std::cerr << "vkCreateDebugUtilsMessengerEXT not found.\n";
+
     return false;
   }
 
@@ -342,12 +370,14 @@ bool Renderer::setupDebug() {
     std::cerr << "CreateDebugUtilsMessenger failed: " << (int)r << "\n";
     return false;
   }
+
   return true;
 }
 
 bool Renderer::createSurface(const Win32WindowHandles &wh) {
   if (!wh.hwnd || !wh.hinstance) {
     std::cerr << "createSurface: invalid window handles.\n";
+
     return false;
   }
 
@@ -359,8 +389,10 @@ bool Renderer::createSurface(const Win32WindowHandles &wh) {
   VkResult r = vkCreateWin32SurfaceKHR(m_instance, &sci, nullptr, &m_surface);
   if (r != VK_SUCCESS || !m_surface) {
     std::cerr << "vkCreateWin32SurfaceKHR failed: " << (int)r << "\n";
+
     return false;
   }
+
   return true;
 }
 
@@ -369,8 +401,10 @@ bool Renderer::pickPhysicalDevice() {
   vkEnumeratePhysicalDevices(m_instance, &count, nullptr);
   if (!count) {
     std::cerr << "No Vulkan physical devices found.\n";
+
     return false;
   }
+
   std::vector<VkPhysicalDevice> devices(count);
   vkEnumeratePhysicalDevices(m_instance, &count, devices.data());
 
@@ -393,40 +427,47 @@ bool Renderer::pickPhysicalDevice() {
     std::optional<uint32_t> present;
 
     for (uint32_t i = 0; i < qCount; ++i) {
-      if (qprops[i].queueCount == 0)
+      if (qprops[i].queueCount == 0) {
         continue;
+      }
 
       if (qprops[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-        if (!gfx)
+        if (!gfx) {
           gfx = i;
+        }
       }
 
       VkBool32 supportsPresent = VK_FALSE;
       vkGetPhysicalDeviceSurfaceSupportKHR(pd, i, m_surface, &supportsPresent);
       if (supportsPresent) {
-        if (!present)
+        if (!present) {
           present = i;
+        }
       }
     }
 
-    if (!gfx || !present)
+    if (!gfx || !present) {
       return -1;
+    }
 
     // Swapchain must have at least one format + present mode.
     auto sup = QuerySwapchainSupport(pd, m_surface);
-    if (sup.formats.empty() || sup.presentModes.empty())
+    if (sup.formats.empty() || sup.presentModes.empty()) {
       return -1;
+    }
 
     VkPhysicalDeviceProperties props{};
     vkGetPhysicalDeviceProperties(pd, &props);
 
     int score = 0;
-    if (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+    if (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
       score += 1000;
+    }
     score += (int)props.limits.maxImageDimension2D;
 
     outGfx = *gfx;
     outPresent = *present;
+
     return score;
   };
 
@@ -447,6 +488,7 @@ bool Renderer::pickPhysicalDevice() {
 
   if (!best) {
     std::cerr << "No suitable GPU found.\n";
+
     return false;
   }
 
@@ -459,6 +501,7 @@ bool Renderer::pickPhysicalDevice() {
   std::cout << "Using GPU: " << props.deviceName << "\n";
   std::cout << "Queue families: graphics=" << m_graphicsFamily
             << " present=" << m_presentFamily << "\n";
+
   return true;
 }
 
@@ -468,6 +511,7 @@ bool Renderer::createDevice() {
 
   std::vector<VkDeviceQueueCreateInfo> qcis;
   qcis.reserve(uniqueFamilies.size());
+
   for (uint32_t fam : uniqueFamilies) {
     VkDeviceQueueCreateInfo qci{};
     qci.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
@@ -504,6 +548,7 @@ bool Renderer::createDevice() {
 
   vkGetDeviceQueue(m_device, m_graphicsFamily, 0, &m_graphicsQueue);
   vkGetDeviceQueue(m_device, m_presentFamily, 0, &m_presentQueue);
+
   return true;
 }
 
@@ -547,6 +592,7 @@ bool Renderer::createSwapchain(int width, int height) {
   VkResult r = vkCreateSwapchainKHR(m_device, &sci, nullptr, &m_swapchain);
   if (r != VK_SUCCESS || !m_swapchain) {
     std::cerr << "vkCreateSwapchainKHR failed: " << (int)r << "\n";
+
     return false;
   }
 
@@ -584,9 +630,11 @@ bool Renderer::createSwapchainViews() {
         vkCreateImageView(m_device, &iv, nullptr, &m_swapchainImageViews[i]);
     if (r != VK_SUCCESS) {
       std::cerr << "vkCreateImageView failed: " << (int)r << "\n";
+
       return false;
     }
   }
+
   return true;
 }
 
@@ -631,8 +679,10 @@ bool Renderer::createRenderPass() {
   VkResult r = vkCreateRenderPass(m_device, &rp, nullptr, &m_renderPass);
   if (r != VK_SUCCESS) {
     std::cerr << "vkCreateRenderPass failed: " << (int)r << "\n";
+
     return false;
   }
+
   return true;
 }
 
@@ -655,9 +705,11 @@ bool Renderer::createFramebuffers() {
         vkCreateFramebuffer(m_device, &fb, nullptr, &m_framebuffers[i]);
     if (r != VK_SUCCESS) {
       std::cerr << "vkCreateFramebuffer failed: " << (int)r << "\n";
+
       return false;
     }
   }
+
   return true;
 }
 
@@ -670,8 +722,10 @@ bool Renderer::createCommandPool() {
   VkResult r = vkCreateCommandPool(m_device, &ci, nullptr, &m_cmdPool);
   if (r != VK_SUCCESS) {
     std::cerr << "vkCreateCommandPool failed: " << (int)r << "\n";
+
     return false;
   }
+
   return true;
 }
 
@@ -685,8 +739,10 @@ bool Renderer::createCommandBuffers() {
   VkResult r = vkAllocateCommandBuffers(m_device, &ai, m_cmd.data());
   if (r != VK_SUCCESS) {
     std::cerr << "vkAllocateCommandBuffers failed: " << (int)r << "\n";
+
     return false;
   }
+
   return true;
 }
 
@@ -698,20 +754,26 @@ bool Renderer::createSyncObjects() {
 
   for (int i = 0; i < kFramesInFlight; ++i) {
     if (vkCreateSemaphore(m_device, &sci, nullptr, &m_imageAvailable[i]) !=
-        VK_SUCCESS)
+        VK_SUCCESS) {
       return false;
+    }
     if (vkCreateSemaphore(m_device, &sci, nullptr, &m_renderFinished[i]) !=
-        VK_SUCCESS)
+        VK_SUCCESS) {
       return false;
-    if (vkCreateFence(m_device, &fci, nullptr, &m_inFlight[i]) != VK_SUCCESS)
+    }
+    if (vkCreateFence(m_device, &fci, nullptr, &m_inFlight[i]) != VK_SUCCESS) {
       return false;
+    }
   }
+
   return true;
 }
 
 void Renderer::destroySwapchain() {
-  for (auto fb : m_framebuffers)
+  for (auto fb : m_framebuffers) {
     vkDestroyFramebuffer(m_device, fb, nullptr);
+  }
+
   m_framebuffers.clear();
 
   if (m_renderPass) {
@@ -719,8 +781,10 @@ void Renderer::destroySwapchain() {
     m_renderPass = VK_NULL_HANDLE;
   }
 
-  for (auto iv : m_swapchainImageViews)
+  for (auto iv : m_swapchainImageViews) {
     vkDestroyImageView(m_device, iv, nullptr);
+  }
+
   m_swapchainImageViews.clear();
   m_swapchainImages.clear();
 
@@ -731,24 +795,32 @@ void Renderer::destroySwapchain() {
 }
 
 bool Renderer::recreateSwapchainIfNeeded() {
-  if (!m_swapchainDirty)
+  if (!m_swapchainDirty) {
     return true;
-  if (m_width <= 0 || m_height <= 0)
+  }
+
+  if (m_width <= 0 || m_height <= 0) {
     return true; // minimized; skip
+  }
 
   waitDeviceIdle();
   destroySwapchain();
 
-  if (!createSwapchain(m_width, m_height))
+  if (!createSwapchain(m_width, m_height)) {
     return false;
-  if (!createSwapchainViews())
+  }
+  if (!createSwapchainViews()) {
     return false;
-  if (!createRenderPass())
+  }
+  if (!createRenderPass()) {
     return false;
-  if (!createFramebuffers())
+  }
+  if (!createFramebuffers()) {
     return false;
+  }
 
   m_swapchainDirty = false;
+
   return true;
 }
 
@@ -781,11 +853,13 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex) {
 }
 
 void Renderer::drawFrame() {
-  if (!m_device)
+  if (!m_device) {
     return;
+  }
 
   if (!recreateSwapchainIfNeeded()) {
     std::cerr << "Swapchain recreation failed.\n";
+
     return;
   }
 
