@@ -33,8 +33,37 @@ target_compile_definitions(evergreen PRIVATE VK_USE_PLATFORM_WIN32_KHR)
 
 target_include_directories(evergreen PRIVATE
   ${CMAKE_SOURCE_DIR}/src
+  ${CMAKE_SOURCE_DIR}/third_party
   "${VULKAN_SDK}/Include"     # provides vulkan/ and SDL3/ headers (SDK)
 )
+
+# --- Shaders (GLSL -> SPIR-V using Vulkan SDK glslc) ---
+set(GLSLC "${VULKAN_SDK}/Bin/glslc.exe")
+
+set(SHADER_SRC_DIR "${CMAKE_SOURCE_DIR}/shaders")
+set(SHADER_OUT_DIR "${CMAKE_SOURCE_DIR}/shaders")
+
+set(SHADERS
+  "${SHADER_SRC_DIR}/pbr.vert"
+  "${SHADER_SRC_DIR}/pbr.frag"
+)
+
+set(SHADER_SPV
+  "${SHADER_OUT_DIR}/pbr.vert.spv"
+  "${SHADER_OUT_DIR}/pbr.frag.spv"
+)
+
+add_custom_command(
+  OUTPUT ${SHADER_SPV}
+  COMMAND "${GLSLC}" "${SHADER_SRC_DIR}/pbr.vert" -o "${SHADER_OUT_DIR}/pbr.vert.spv"
+  COMMAND "${GLSLC}" "${SHADER_SRC_DIR}/pbr.frag" -o "${SHADER_OUT_DIR}/pbr.frag.spv"
+  DEPENDS ${SHADERS}
+  COMMENT "Compiling shaders with glslc"
+  VERBATIM
+)
+
+add_custom_target(evergreen_shaders ALL DEPENDS ${SHADER_SPV})
+add_dependencies(evergreen evergreen_shaders)
 
 # Static SDL build expects this define
 target_compile_definitions(evergreen PRIVATE SDL_STATIC_LIB)
