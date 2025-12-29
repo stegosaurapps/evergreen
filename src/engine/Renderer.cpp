@@ -382,7 +382,7 @@ void Renderer::shutdown() {
     m_cmdPool = VK_NULL_HANDLE;
   }
 
-  destroyPipelineResources();
+  destroyDeviceResources();
 
   destroySwapchain();
 
@@ -782,8 +782,6 @@ bool Renderer::createSwapchainViews() {
 }
 
 bool Renderer::createDepthResources() {
-  // In a real engine you’d probe supported formats. For the demo we
-  // assume D32_SFLOAT is available (common on desktop).
   if (m_depthView) {
     destroyDepthResources();
   }
@@ -1194,6 +1192,12 @@ bool Renderer::createPipeline() {
   pcr.offset = 0;
   pcr.size = sizeof(Mat4);
 
+  if (m_setLayoutFrame == VK_NULL_HANDLE) {
+    std::cerr << "createPipeline: m_setLayoutFrame is VK_NULL_HANDLE "
+                 "(descriptor set layout missing)\n";
+    return false;
+  }
+
   VkPipelineLayoutCreateInfo pl{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
   pl.setLayoutCount = 1;
   pl.pSetLayouts = &m_setLayoutFrame;
@@ -1312,21 +1316,13 @@ bool Renderer::createMeshBuffers() {
 void Renderer::updatePerFrameUBO(int frameIndex) {
   // Keep camera current (aspect updates on resize handled in onResize).
   m_camera.updateMatrices();
+
   std::memcpy(m_uboMapped[frameIndex], &m_camera.ubo(), sizeof(CameraUBO));
 }
 
-void Renderer::destroyPipelineResources() {
+void Renderer::destroyDeviceResources() {
   if (!m_device) {
     return;
-  }
-
-  if (m_pipeline) {
-    vkDestroyPipeline(m_device, m_pipeline, nullptr);
-    m_pipeline = VK_NULL_HANDLE;
-  }
-  if (m_pipelineLayout) {
-    vkDestroyPipelineLayout(m_device, m_pipelineLayout, nullptr);
-    m_pipelineLayout = VK_NULL_HANDLE;
   }
 
   // Mesh buffers
@@ -1338,6 +1334,7 @@ void Renderer::destroyPipelineResources() {
     vkFreeMemory(m_device, m_vertexMemory, nullptr);
     m_vertexMemory = VK_NULL_HANDLE;
   }
+
   if (m_indexBuffer) {
     vkDestroyBuffer(m_device, m_indexBuffer, nullptr);
     m_indexBuffer = VK_NULL_HANDLE;
@@ -1347,29 +1344,50 @@ void Renderer::destroyPipelineResources() {
     m_indexMemory = VK_NULL_HANDLE;
   }
 
-  // Uniform buffers
+  // Uniform buffers (per-frame)
   for (int i = 0; i < kFramesInFlight; ++i) {
     if (m_uboMapped[i]) {
       vkUnmapMemory(m_device, m_uboMemory[i]);
       m_uboMapped[i] = nullptr;
     }
+
     if (m_uboBuffer[i]) {
       vkDestroyBuffer(m_device, m_uboBuffer[i], nullptr);
       m_uboBuffer[i] = VK_NULL_HANDLE;
     }
+
     if (m_uboMemory[i]) {
       vkFreeMemory(m_device, m_uboMemory[i], nullptr);
       m_uboMemory[i] = VK_NULL_HANDLE;
     }
   }
 
+  // Descriptor pool
   if (m_descPool) {
     vkDestroyDescriptorPool(m_device, m_descPool, nullptr);
     m_descPool = VK_NULL_HANDLE;
   }
+
+  // Descriptor set layout
   if (m_setLayoutFrame) {
     vkDestroyDescriptorSetLayout(m_device, m_setLayoutFrame, nullptr);
     m_setLayoutFrame = VK_NULL_HANDLE;
+  }
+}
+
+void Renderer::destroyPipelineResources() {
+  if (!m_device) {
+    return;
+  }
+
+  if (m_pipeline) {
+    vkDestroyPipeline(m_device, m_pipeline, nullptr);
+    m_pipeline = VK_NULL_HANDLE;
+  }
+
+  if (m_pipelineLayout) {
+    vkDestroyPipelineLayout(m_device, m_pipelineLayout, nullptr);
+    m_pipelineLayout = VK_NULL_HANDLE;
   }
 }
 
@@ -1418,15 +1436,19 @@ bool Renderer::recreateSwapchainIfNeeded() {
   if (!createSwapchain(m_width, m_height)) {
     return false;
   }
+
   if (!createSwapchainViews()) {
     return false;
   }
+
   if (!createRenderPass()) {
     return false;
   }
+
   if (!createDepthResources()) {
     return false;
   }
+
   if (!createFramebuffers()) {
     return false;
   }
@@ -1535,6 +1557,7 @@ void Renderer::drawFrame() {
   }
 
   vkResetCommandBuffer(m_cmd[fi], 0);
+
   // Update UBO for this frame-in-flight before recording.
   updatePerFrameUBO(fi);
   recordCommandBuffer(m_cmd[fi], imageIndex);

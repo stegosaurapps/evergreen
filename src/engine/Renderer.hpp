@@ -52,6 +52,7 @@ private:
   void destroySwapchain();
   bool recreateSwapchainIfNeeded();
 
+  void destroyDeviceResources();
   void destroyDepthResources();
   void destroyPipelineResources();
 

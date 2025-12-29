@@ -18,12 +18,14 @@ bool Engine::init() {
     return false;
   }
 
-  bool enableValidation =
-#if defined(_DEBUG)
-      true;
-#else
-      false;
-#endif
+  //   bool enableValidation =
+  // #if defined(_DEBUG)
+  //       true;
+  // #else
+  //       false;
+  // #endif
+
+  bool enableValidation = true;
 
   if (!m_renderer.init(wh, startW, startH, enableValidation)) {
     std::cerr << "Engine: renderer init failed.\n";
@@ -35,6 +37,7 @@ bool Engine::init() {
 
 int Engine::run() {
   bool running = true;
+
   while (running) {
     running = m_window.pumpEvents();
 
@@ -52,5 +55,6 @@ int Engine::run() {
 void Engine::shutdown() {
   // Renderer depends on window surface, so renderer down first.
   m_renderer.shutdown();
+
   m_window.shutdown();
 }
