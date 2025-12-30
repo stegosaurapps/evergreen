@@ -46,17 +46,23 @@ set(SHADER_OUT_DIR "${CMAKE_SOURCE_DIR}/shaders")
 set(SHADERS
   "${SHADER_SRC_DIR}/pbr.vert"
   "${SHADER_SRC_DIR}/pbr.frag"
+  "${SHADER_SRC_DIR}/test.vert"
+  "${SHADER_SRC_DIR}/test.frag"
 )
 
 set(SHADER_SPV
   "${SHADER_OUT_DIR}/pbr.vert.spv"
   "${SHADER_OUT_DIR}/pbr.frag.spv"
+  "${SHADER_OUT_DIR}/test.vert.spv"
+  "${SHADER_OUT_DIR}/test.frag.spv"  
 )
 
 add_custom_command(
   OUTPUT ${SHADER_SPV}
   COMMAND "${GLSLC}" "${SHADER_SRC_DIR}/pbr.vert" -o "${SHADER_OUT_DIR}/pbr.vert.spv"
   COMMAND "${GLSLC}" "${SHADER_SRC_DIR}/pbr.frag" -o "${SHADER_OUT_DIR}/pbr.frag.spv"
+  COMMAND "${GLSLC}" "${SHADER_SRC_DIR}/test.vert" -o "${SHADER_OUT_DIR}/test.vert.spv"
+  COMMAND "${GLSLC}" "${SHADER_SRC_DIR}/test.frag" -o "${SHADER_OUT_DIR}/test.frag.spv"
   DEPENDS ${SHADERS}
   COMMENT "Compiling shaders with glslc"
   VERBATIM

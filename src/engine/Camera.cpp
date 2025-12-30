@@ -27,3 +27,28 @@ void Camera::updateMatrices() {
   m_ubo.viewProj = mul(m_ubo.proj, m_ubo.view);
   m_ubo.viewPos = {m_pos.x, m_pos.y, m_pos.z, 1.0f};
 }
+
+void Camera::orbitStep(float dtSeconds, float yawSpeed) {
+  m_orbitYaw += dtSeconds * yawSpeed;
+
+  // clamp pitch to avoid pole flip
+  const float kPitchLimit = 1.4f;
+  if (m_orbitPitch > kPitchLimit)
+    m_orbitPitch = kPitchLimit;
+  if (m_orbitPitch < -kPitchLimit)
+    m_orbitPitch = -kPitchLimit;
+
+  float cy = cosf(m_orbitYaw);
+  float sy = sinf(m_orbitYaw);
+  float cp = cosf(m_orbitPitch);
+  float sp = sinf(m_orbitPitch);
+
+  Vec3 eye{
+      m_orbitTarget.x + m_orbitRadius * (cp * cy),
+      m_orbitTarget.y + m_orbitRadius * (sp),
+      m_orbitTarget.z + m_orbitRadius * (cp * sy),
+  };
+
+  setPosition(eye);
+  lookAt(m_orbitTarget);
+}

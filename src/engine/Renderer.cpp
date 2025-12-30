@@ -7,6 +7,10 @@
 #endif
 
 #include "Renderer.hpp"
+#include "Cube.hpp"
+#include "Vertex.hpp"
+
+#include <SDL3/SDL.h>
 
 #include <windows.h>
 
@@ -348,6 +352,10 @@ bool Renderer::init(const Win32WindowHandles &wh, int width, int height,
     return false;
   }
 
+  if (!createCubeMesh()) {
+    return false;
+  }
+
   std::cout << "Renderer init OK.\n";
 
   return true;
@@ -382,9 +390,9 @@ void Renderer::shutdown() {
     m_cmdPool = VK_NULL_HANDLE;
   }
 
-  destroyDeviceResources();
-
+  destroyPipelineResources();
   destroySwapchain();
+  destroyDeviceResources();
 
   if (m_device) {
     vkDestroyDevice(m_device, nullptr);
@@ -1061,10 +1069,14 @@ bool Renderer::createUniformBuffers() {
   }
 
   // Initialize camera.
+  m_camera.setOrbitTarget({0.0f, 0.0f, 0.0f});
+  m_camera.setOrbitRadius(4.0f);
+  m_camera.setOrbitAngles(0.0f, 0.35f);
   m_camera.setPerspective(1.04719755f, (float)m_width / (float)m_height, 0.1f,
                           200.0f);
   m_camera.lookAt({0.0f, 0.0f, 0.0f});
   m_camera.updateMatrices();
+
   return true;
 }
 
@@ -1088,9 +1100,16 @@ bool Renderer::createPipeline() {
 
   std::vector<char> vsBytes;
   std::vector<char> fsBytes;
-  if (!ReadFileBytes("shaders/pbr.vert.spv", vsBytes) ||
-      !ReadFileBytes("shaders/pbr.frag.spv", fsBytes)) {
-    std::cerr << "Missing shaders. Build will generate shaders/pbr.*.spv (via "
+  // if (!ReadFileBytes("shaders/pbr.vert.spv", vsBytes) ||
+  //     !ReadFileBytes("shaders/pbr.frag.spv", fsBytes)) {
+  //   std::cerr << "Missing shaders. Build will generate shaders/pbr.*.spv (via
+  //   "
+  //                "glslc).\n";
+  //   return false;
+  // }
+  if (!ReadFileBytes("shaders/test.vert.spv", vsBytes) ||
+      !ReadFileBytes("shaders/test.frag.spv", fsBytes)) {
+    std::cerr << "Missing shaders. Build will generate shaders/test.*.spv (via "
                  "glslc).\n";
     return false;
   }
@@ -1115,25 +1134,45 @@ bool Renderer::createPipeline() {
   // Vertex input
   VkVertexInputBindingDescription bind{};
   bind.binding = 0;
-  bind.stride = sizeof(Vertex);
+  bind.stride = sizeof(VertexPCN);
   bind.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
+  // VkVertexInputAttributeDescription attrs[3]{};
+  // // position
+  // attrs[0].location = 0;
+  // attrs[0].binding = 0;
+  // attrs[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+  // attrs[0].offset = offsetof(Vertex, px);
+  // // normal
+  // attrs[1].location = 1;
+  // attrs[1].binding = 0;
+  // attrs[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+  // attrs[1].offset = offsetof(Vertex, nx);
+  // // uv
+  // attrs[2].location = 2;
+  // attrs[2].binding = 0;
+  // attrs[2].format = VK_FORMAT_R32G32_SFLOAT;
+  // attrs[2].offset = offsetof(Vertex, ux);
+
   VkVertexInputAttributeDescription attrs[3]{};
+
   // position
   attrs[0].location = 0;
   attrs[0].binding = 0;
   attrs[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-  attrs[0].offset = offsetof(Vertex, px);
+  attrs[0].offset = offsetof(VertexPCN, px);
+
   // normal
   attrs[1].location = 1;
   attrs[1].binding = 0;
   attrs[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-  attrs[1].offset = offsetof(Vertex, nx);
-  // uv
+  attrs[1].offset = offsetof(VertexPCN, nx);
+
+  // color
   attrs[2].location = 2;
   attrs[2].binding = 0;
-  attrs[2].format = VK_FORMAT_R32G32_SFLOAT;
-  attrs[2].offset = offsetof(Vertex, ux);
+  attrs[2].format = VK_FORMAT_R32G32B32_SFLOAT;
+  attrs[2].offset = offsetof(VertexPCN, r);
 
   VkPipelineVertexInputStateCreateInfo vi{
       VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
@@ -1158,6 +1197,7 @@ bool Renderer::createPipeline() {
   rs.cullMode = VK_CULL_MODE_BACK_BIT;
   rs.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
   rs.lineWidth = 1.0f;
+  rs.cullMode = VK_CULL_MODE_NONE;
 
   VkPipelineMultisampleStateCreateInfo ms{
       VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
@@ -1314,6 +1354,16 @@ bool Renderer::createMeshBuffers() {
 }
 
 void Renderer::updatePerFrameUBO(int frameIndex) {
+  // dt
+  uint64_t now = SDL_GetTicks();
+  if (m_lastTicks == 0)
+    m_lastTicks = now;
+  float dt = float(now - m_lastTicks) / 1000.0f;
+  m_lastTicks = now;
+
+  // orbit update (camera owns orbit state)
+  m_camera.orbitStep(dt);
+
   // Keep camera current (aspect updates on resize handled in onResize).
   m_camera.updateMatrices();
 
@@ -1361,6 +1411,26 @@ void Renderer::destroyDeviceResources() {
       m_uboMemory[i] = VK_NULL_HANDLE;
     }
   }
+
+  // Cube resources
+  // TODO: Move to scene
+  if (m_cubeVB) {
+    vkDestroyBuffer(m_device, m_cubeVB, nullptr);
+    m_cubeVB = VK_NULL_HANDLE;
+  }
+  if (m_cubeVBMem) {
+    vkFreeMemory(m_device, m_cubeVBMem, nullptr);
+    m_cubeVBMem = VK_NULL_HANDLE;
+  }
+  if (m_cubeIB) {
+    vkDestroyBuffer(m_device, m_cubeIB, nullptr);
+    m_cubeIB = VK_NULL_HANDLE;
+  }
+  if (m_cubeIBMem) {
+    vkFreeMemory(m_device, m_cubeIBMem, nullptr);
+    m_cubeIBMem = VK_NULL_HANDLE;
+  }
+  m_cubeIndexCount = 0;
 
   // Descriptor pool
   if (m_descPool) {
@@ -1509,17 +1579,25 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex) {
                           0, nullptr);
 
   // Push model matrix for the first renderable.
-  Mat4 model = Mat4::identity();
-  if (!m_scene.items().empty()) {
-    model = m_scene.items()[0].transform.matrix();
-  }
+  // Mat4 model = Mat4::identity();
+  // if (!m_scene.items().empty()) {
+  //   model = m_scene.items()[0].transform.matrix();
+  // }
+  // vkCmdPushConstants(cmd, m_pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0,
+  //                    sizeof(Mat4), &model);
+
+  Mat4 model = Mat4::identity(); // MUST be initialized
   vkCmdPushConstants(cmd, m_pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0,
                      sizeof(Mat4), &model);
 
   VkDeviceSize off = 0;
-  vkCmdBindVertexBuffers(cmd, 0, 1, &m_vertexBuffer, &off);
-  vkCmdBindIndexBuffer(cmd, m_indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-  vkCmdDrawIndexed(cmd, m_indexCount, 1, 0, 0, 0);
+  vkCmdBindVertexBuffers(cmd, 0, 1, &m_cubeVB, &off);
+  vkCmdBindIndexBuffer(cmd, m_cubeIB, 0, VK_INDEX_TYPE_UINT32);
+  // vkCmdBindVertexBuffers(cmd, 0, 1, &m_vertexBuffer, &off);
+  // vkCmdBindIndexBuffer(cmd, m_indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+  // vkCmdDrawIndexed(cmd, m_indexCount, 1, 0, 0, 0);
+  vkCmdDrawIndexed(cmd, m_cubeIndexCount, 1, 0, 0, 0);
 
   vkCmdEndRenderPass(cmd);
 
@@ -1597,4 +1675,49 @@ void Renderer::drawFrame() {
   }
 
   m_frameIndex = (m_frameIndex + 1) % kFramesInFlight;
+}
+
+bool Renderer::createCubeMesh() {
+  std::vector<VertexPCN> verts;
+  std::vector<uint32_t> idx;
+
+  BuildCube(verts, idx);
+
+  m_cubeIndexCount = (uint32_t)idx.size();
+
+  const VkDeviceSize vbSize = sizeof(VertexPCN) * verts.size();
+  const VkDeviceSize ibSize = sizeof(uint32_t) * idx.size();
+
+  // For now: simplest path, host-visible buffers (fine for a test cube).
+  if (!CreateBuffer(m_physicalDevice, m_device, vbSize,
+                    VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                    m_cubeVB, m_cubeVBMem)) {
+    std::cerr << "Failed to create cube VB\n";
+    return false;
+  }
+
+  if (!CreateBuffer(m_physicalDevice, m_device, ibSize,
+                    VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                    m_cubeIB, m_cubeIBMem)) {
+    std::cerr << "Failed to create cube IB\n";
+    return false;
+  }
+
+  // Upload
+  void *p = nullptr;
+  vkMapMemory(m_device, m_cubeVBMem, 0, vbSize, 0, &p);
+  std::memcpy(p, verts.data(), (size_t)vbSize);
+  vkUnmapMemory(m_device, m_cubeVBMem);
+
+  vkMapMemory(m_device, m_cubeIBMem, 0, ibSize, 0, &p);
+  std::memcpy(p, idx.data(), (size_t)ibSize);
+  vkUnmapMemory(m_device, m_cubeIBMem);
+
+  std::cout << "Cube verts=" << verts.size() << " idx=" << idx.size() << "\n";
+
+  return true;
 }

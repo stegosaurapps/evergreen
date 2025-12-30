@@ -23,6 +23,17 @@ public:
 
   const CameraUBO &ubo() const { return m_ubo; }
 
+  // Orbit controls
+  void setOrbitTarget(Vec3 t) { m_orbitTarget = t; }
+  void setOrbitRadius(float r) { m_orbitRadius = r; }
+  void setOrbitAngles(float yawRadians, float pitchRadians) {
+    m_orbitYaw = yawRadians;
+    m_orbitPitch = pitchRadians;
+  }
+
+  // Call once per frame. dtSeconds can come from Engine/Renderer.
+  void orbitStep(float dtSeconds, float yawSpeed = 0.7f);
+
 private:
   Vec3 m_pos{0.0f, 0.0f, 3.0f};
   Vec3 m_target{0.0f, 0.0f, 0.0f};
@@ -32,6 +43,12 @@ private:
   float m_aspect = 16.0f / 9.0f;
   float m_zNear = 0.1f;
   float m_zFar = 200.0f;
+
+  // Orbit state (camera owns it)
+  Vec3 m_orbitTarget{0.0f, 0.0f, 0.0f};
+  float m_orbitRadius = 4.0f;
+  float m_orbitYaw = 0.0f;    // radians
+  float m_orbitPitch = 0.35f; // radians
 
   CameraUBO m_ubo{};
 };

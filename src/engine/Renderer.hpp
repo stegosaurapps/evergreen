@@ -62,8 +62,12 @@ private:
 
   void updatePerFrameUBO(int frameIndex);
 
+  bool createCubeMesh();
+
 private:
   static constexpr int kFramesInFlight = 2;
+
+  uint64_t m_lastTicks = 0;
 
   bool m_enableValidation = false;
   bool m_swapchainDirty = false;
@@ -130,4 +134,11 @@ private:
   std::array<VkSemaphore, kFramesInFlight> m_imageAvailable{};
   std::array<VkSemaphore, kFramesInFlight> m_renderFinished{};
   std::array<VkFence, kFramesInFlight> m_inFlight{};
+
+  // Test mesh GPU resources
+  VkBuffer m_cubeVB = VK_NULL_HANDLE;
+  VkDeviceMemory m_cubeVBMem = VK_NULL_HANDLE;
+  VkBuffer m_cubeIB = VK_NULL_HANDLE;
+  VkDeviceMemory m_cubeIBMem = VK_NULL_HANDLE;
+  uint32_t m_cubeIndexCount = 0;
 };
