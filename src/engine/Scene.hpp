@@ -1,44 +1,89 @@
 #pragma once
 
-#include "Math.hpp"
+#include "Camera.hpp"
+#include "Constants.hpp"
+#include "Mesh.hpp"
+#include "Renderable.hpp"
+// #include "Renderer.hpp"
+#include "Transform.hpp"
+#include "Vertex.hpp"
 
+#include <vulkan/vulkan.h>
+
+#include <array>
 #include <cstdint>
+#include <functional>
 #include <vector>
 
-struct Transform {
-  Vec3 position{0.0f, 0.0f, 0.0f};
-  Vec3 scaleV{1.0f, 1.0f, 1.0f};
-  // rotation omitted for now (add quaternion later if you want)
-
-  Mat4 matrix() const { return mul(translate(position), scale(scaleV)); }
-};
-
-// CPU-side vertex for the demo.
-struct Vertex {
-  float px, py, pz;
-  float nx, ny, nz;
-  float ux, uy;
-};
-
-struct Mesh {
-  std::vector<Vertex> vertices;
-  std::vector<uint32_t> indices;
-};
-
-struct Renderable {
-  Transform transform;
-  Mesh mesh;
-};
+class Renderer; // forward declaration
 
 class Scene {
 public:
-  Renderable &add(Renderable r) {
-    m_items.push_back(std::move(r));
-    return m_items.back();
-  }
+  Scene() = default;
+  ~Scene();
 
-  const std::vector<Renderable> &items() const { return m_items; }
+  void init(Renderer &renderer, Camera camera,
+            std::vector<Renderable> renderables,
+            std::function<void(Renderer &, Scene *)> createPipeline,
+            std::function<void(Renderer &, Scene *)> destroyPipeline);
+  void update(Renderer &renderer, float deltaTime);
+  void draw(Renderer &renderer);
+  void createPipeline(Renderer &renderer);
+  void destroyPipeline(Renderer &renderer);
+  void resize(int width, int height);
+
+  void attachCamera(Camera camera);
+  Camera &camera();
+
+  void addRenderable(Renderable renderable);
+  std::vector<Renderable> &renderables();
+
+  VkPipelineLayout *pipelineLayout();
+  VkPipeline *pipeline();
+
+  VkDescriptorSetLayout *descriptorSetLayout();
+  VkDescriptorPool *descriptorPool();
+  std::array<VkDescriptorSet, FRAME_COUNT> *descriptorSets();
+
+  std::array<VkBuffer, FRAME_COUNT> *uboBufferList();
+  std::array<VkDeviceMemory, FRAME_COUNT> *uboMemoryList();
+  std::array<void *, FRAME_COUNT> *uboMappedList();
+
+  uint32_t *indexCount();
+  VkBuffer *vertexBuffer();
+  VkDeviceMemory *vertexMemory();
+  VkBuffer *indexBuffer();
+  VkDeviceMemory *indexMemory();
+
+  void shutdown();
 
 private:
-  std::vector<Renderable> m_items;
+  Camera m_camera;
+  std::vector<Renderable> m_renderables;
+
+  // Pipeline
+  VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
+  VkPipeline m_pipeline = VK_NULL_HANDLE;
+
+  // Descriptors (set 0 = per-frame camera)
+  VkDescriptorSetLayout m_descriptorSetLayout = VK_NULL_HANDLE;
+  VkDescriptorPool m_descriptorPool = VK_NULL_HANDLE;
+  std::array<VkDescriptorSet, FRAME_COUNT> m_DescriptorSets{};
+
+  // Uniform buffers (one per frame-in-flight)
+  std::array<VkBuffer, FRAME_COUNT> m_uboBufferList{};
+  std::array<VkDeviceMemory, FRAME_COUNT> m_uboMemoryList{};
+  std::array<void *, FRAME_COUNT> m_uboMappedList{};
+
+  // One demo mesh on GPU (first scene renderable)
+  uint32_t m_indexCount = 0;
+  VkBuffer m_vertexBuffer = VK_NULL_HANDLE;
+  VkDeviceMemory m_vertexMemory = VK_NULL_HANDLE;
+  VkBuffer m_indexBuffer = VK_NULL_HANDLE;
+  VkDeviceMemory m_indexMemory = VK_NULL_HANDLE;
+
+  std::function<void(Renderer &, Scene *)> m_createPipeline;
+  std::function<void(Renderer &, Scene *)> m_destroyPipeline;
+
+  void destroyResources(Renderer &renderer);
 };

@@ -1,4 +1,5 @@
 #include "src/engine/Engine.hpp"
+#include "src/scenes/Basic.hpp"
 
 #include <iostream>
 
@@ -8,5 +9,9 @@ int main(int, char**) {
         return 1;
     }
 
-    return engine.run();
+    engine.loadScene(LoadScene(engine.renderer()));
+
+    engine.run();
+
+    return 0;
 }

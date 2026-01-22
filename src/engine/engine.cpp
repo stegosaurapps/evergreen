@@ -24,7 +24,6 @@ bool Engine::init() {
   // #else
   //       false;
   // #endif
-
   bool enableValidation = true;
 
   if (!m_renderer.init(wh, startW, startH, enableValidation)) {
@@ -35,26 +34,40 @@ bool Engine::init() {
   return true;
 }
 
-int Engine::run() {
+void Engine::run() {
   bool running = true;
 
   while (running) {
     running = m_window.pumpEvents();
 
+    tick();
+
     if (m_window.wasResized()) {
       m_renderer.onResize(m_window.width(), m_window.height());
+      m_scene.get()->resize(m_window.width(), m_window.height());
+
       m_window.clearResizedFlag();
     }
 
-    m_renderer.drawFrame();
-  }
+    m_renderer.update(m_deltaTime);
+    m_scene.get()->update(m_renderer, m_deltaTime);
 
-  return 0;
+    m_renderer.drawFrame(m_scene.get());
+  }
+}
+
+void Engine::tick() {
+  uint64_t now = SDL_GetTicks();
+  if (m_previousTime == 0) {
+    m_previousTime = now;
+  }
+  m_deltaTime = float(now - m_previousTime) / 1000.0f;
+  m_previousTime = now;
 }
 
 void Engine::shutdown() {
-  // Renderer depends on window surface, so renderer down first.
+  // Order matters, scene depends on renderer, and renderer depends on window.
+  m_scene.get()->shutdown();
   m_renderer.shutdown();
-
   m_window.shutdown();
 }

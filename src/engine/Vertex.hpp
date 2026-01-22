@@ -1,5 +1,11 @@
 #pragma once
 
+struct Vertex {
+  float px, py, pz;
+  float nx, ny, nz;
+  float ux, uy;
+};
+
 struct VertexPCN {
   float px, py, pz;
   float nx, ny, nz;

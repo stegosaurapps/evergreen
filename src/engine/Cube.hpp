@@ -1,4 +1,5 @@
 #pragma once
+
 #include "vertex.hpp"
 #include <cstdint>
 #include <vector>

@@ -6,7 +6,7 @@ Window::~Window() { shutdown(); }
 
 bool Window::init(const char *title, int width, int height) {
   if (!SDL_Init(SDL_INIT_VIDEO)) {
-    std::cerr << "SDL_Init failed: " << SDL_GetError() << "\n";
+    std::cerr << "SDL_Init failed: " << SDL_GetError() << std::endl;
     return false;
   }
 
@@ -17,7 +17,7 @@ bool Window::init(const char *title, int width, int height) {
                               SDL_WINDOW_RESIZABLE | SDL_WINDOW_VULKAN);
 
   if (!m_window) {
-    std::cerr << "SDL_CreateWindow failed: " << SDL_GetError() << "\n";
+    std::cerr << "SDL_CreateWindow failed: " << SDL_GetError() << std::endl;
     SDL_Quit();
     return false;
   }
@@ -30,6 +30,7 @@ void Window::shutdown() {
     SDL_DestroyWindow(m_window);
     m_window = nullptr;
   }
+
   // Safe to call even if SDL wasn’t initialized, but we only do it if we own
   // init flow.
   SDL_Quit();
@@ -72,7 +73,8 @@ Win32WindowHandles Window::win32Handles() const {
 
   SDL_PropertiesID props = SDL_GetWindowProperties(m_window);
   if (!props) {
-    std::cerr << "SDL_GetWindowProperties failed: " << SDL_GetError() << "\n";
+    std::cerr << "SDL_GetWindowProperties failed: " << SDL_GetError()
+              << std::endl;
 
     return wh;
   }
