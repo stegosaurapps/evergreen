@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <vector>
 
-inline void BuildCube(std::vector<VertexPCN> &outVerts,
+inline void BuildCube(std::vector<VertexColor> &outVerts,
                       std::vector<uint32_t> &outIdx) {
   outVerts = {
       // +X

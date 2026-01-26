@@ -6,13 +6,13 @@ struct Vertex {
   float ux, uy;
 };
 
-struct VertexPCN {
+struct VertexColor {
   float px, py, pz;
   float nx, ny, nz;
   float r, g, b;
 };
 
-static_assert(sizeof(VertexPCN) == 36, "VertexPCN must be 36 bytes");
-static_assert(offsetof(VertexPCN, px) == 0, "pos offset");
-static_assert(offsetof(VertexPCN, nx) == 12, "nrm offset");
-static_assert(offsetof(VertexPCN, r) == 24, "col offset");
+static_assert(sizeof(VertexColor) == 36, "VertexColor must be 36 bytes");
+static_assert(offsetof(VertexColor, px) == 0, "pos offset");
+static_assert(offsetof(VertexColor, nx) == 12, "nrm offset");
+static_assert(offsetof(VertexColor, r) == 24, "col offset");
