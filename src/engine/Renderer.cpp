@@ -6,13 +6,12 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 
-#include "Renderer.hpp"
-#include "Helpers.hpp"
-#include "SecretHelpers.hpp"
+#include "../Vulkan.hpp"
 
-#include "../Cube.hpp"
-#include "../Scene.hpp"
-#include "../Vertex.hpp"
+#include "Cube.hpp"
+#include "Renderer.hpp"
+#include "Scene.hpp"
+#include "Vertex.hpp"
 
 #include <SDL3/SDL.h>
 
@@ -24,8 +23,6 @@
 #include <iostream>
 #include <optional>
 #include <set>
-
-Renderer::~Renderer() { shutdown(); }
 
 bool Renderer::init(const Win32WindowHandles &windowHandler, int width,
                     int height, bool enableValidation) {
@@ -54,6 +51,96 @@ bool Renderer::init(const Win32WindowHandles &windowHandler, int width,
   std::cout << "Renderer init OK.\n";
 
   return true;
+}
+
+int Renderer::frameIndex() { return m_frameIndex; };
+
+Dimensions Renderer::dimensions() {
+  return Dimensions{(float)m_width, (float)m_height};
+};
+
+VkPhysicalDevice Renderer::physicalDevice() { return m_physicalDevice; }
+
+VkDevice Renderer::device() { return m_device; }
+
+VkSampleCountFlagBits Renderer::sampleCount() { return m_sampleCount; }
+
+VkRenderPass Renderer::renderPass() { return m_renderPass; }
+
+void Renderer::resize(int width, int height) {
+  m_width = width;
+  m_height = height;
+  m_swapchainDirty = true;
+}
+
+void Renderer::update(float deltaTime) {}
+
+void Renderer::drawFrame(Scene *scene) {
+  if (!m_device) {
+    return;
+  }
+
+  recreateSwapchainIfNeeded(scene);
+
+  const int frameIndex = m_frameIndex;
+
+  vkWaitForFences(m_device, 1, &m_inFlight[frameIndex], VK_TRUE, UINT64_MAX);
+  vkResetFences(m_device, 1, &m_inFlight[frameIndex]);
+
+  uint32_t imageIndex = 0;
+  VkResult result = vkAcquireNextImageKHR(m_device, m_swapchain, UINT64_MAX,
+                                          m_imageAvailable[frameIndex],
+                                          VK_NULL_HANDLE, &imageIndex);
+
+  if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+    m_swapchainDirty = true;
+    return;
+  }
+  if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+    std::cerr << "vkAcquireNextImageKHR failed: " << (int)result << std::endl;
+    std::abort();
+  }
+
+  vkResetCommandBuffer(m_cmd[frameIndex], 0);
+  recordCommandBuffer(m_cmd[frameIndex], imageIndex, scene);
+
+  VkPipelineStageFlags waitStage =
+      VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+
+  VkSubmitInfo submitInfo{};
+  submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  submitInfo.waitSemaphoreCount = 1;
+  submitInfo.pWaitSemaphores = &m_imageAvailable[frameIndex];
+  submitInfo.pWaitDstStageMask = &waitStage;
+  submitInfo.commandBufferCount = 1;
+  submitInfo.pCommandBuffers = &m_cmd[frameIndex];
+  submitInfo.signalSemaphoreCount = 1;
+  submitInfo.pSignalSemaphores = &m_renderFinished[frameIndex];
+
+  result =
+      vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, m_inFlight[frameIndex]);
+  if (result != VK_SUCCESS) {
+    std::cerr << "vkQueueSubmit failed: " << (int)result << std::endl;
+    std::abort();
+  }
+
+  VkPresentInfoKHR presentInfo{};
+  presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+  presentInfo.waitSemaphoreCount = 1;
+  presentInfo.pWaitSemaphores = &m_renderFinished[frameIndex];
+  presentInfo.swapchainCount = 1;
+  presentInfo.pSwapchains = &m_swapchain;
+  presentInfo.pImageIndices = &imageIndex;
+
+  result = vkQueuePresentKHR(m_presentQueue, &presentInfo);
+  if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+    m_swapchainDirty = true;
+  } else if (result != VK_SUCCESS) {
+    std::cerr << "vkQueuePresentKHR failed: " << (int)result << std::endl;
+    std::abort();
+  }
+
+  m_frameIndex = (m_frameIndex + 1) % FRAME_COUNT;
 }
 
 void Renderer::shutdown() {
@@ -120,19 +207,6 @@ void Renderer::shutdown() {
   m_presentFamily = UINT32_MAX;
 
   std::cout << "Renderer shutdown OK.\n";
-}
-
-void Renderer::onResize(int width, int height) {
-  m_width = width;
-  m_height = height;
-  m_swapchainDirty = true;
-}
-
-void Renderer::update(float deltaTime) {}
-
-void Renderer::waitDeviceIdle() {
-  if (m_device)
-    vkDeviceWaitIdle(m_device);
 }
 
 void Renderer::createInstance() {
@@ -482,170 +556,7 @@ void Renderer::createSwapchainViews() {
   }
 }
 
-void Renderer::createColorResources() {
-  if (m_colorView) {
-    vkDestroyImageView(m_device, m_colorView, nullptr);
-    m_colorView = VK_NULL_HANDLE;
-  }
-
-  if (m_colorImage) {
-    vkDestroyImage(m_device, m_colorImage, nullptr);
-    m_colorImage = VK_NULL_HANDLE;
-  }
-
-  if (m_colorMemory) {
-    vkFreeMemory(m_device, m_colorMemory, nullptr);
-    m_colorMemory = VK_NULL_HANDLE;
-  }
-
-  if (m_sampleCount == VK_SAMPLE_COUNT_1_BIT) {
-    return; // no MSAA needed
-  }
-
-  if (!CreateImage2D(m_physicalDevice, m_device, m_sampleCount,
-                     m_swapchainExtent.width, m_swapchainExtent.height,
-                     m_swapchainFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-                     m_colorImage, m_colorMemory)) {
-    std::cerr << "Failed to create MSAA color image" << std::endl;
-    std::abort();
-  }
-
-  m_colorView = CreateImageView(m_device, m_colorImage, m_swapchainFormat,
-                                VK_IMAGE_ASPECT_COLOR_BIT);
-
-  if (!m_colorView) {
-    std::cerr << "Failed to create MSAA color image view" << std::endl;
-    std::abort();
-  }
-}
-
-void Renderer::createDepthResources() {
-  if (m_depthView) {
-    destroyDepthResources();
-  }
-
-  if (!CreateImage2D(m_physicalDevice, m_device, m_sampleCount,
-                     m_swapchainExtent.width, m_swapchainExtent.height,
-                     m_depthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-                     m_depthImage, m_depthMemory)) {
-    std::cerr << "Failed to create depth image" << std::endl;
-    std::abort();
-  }
-
-  m_depthView = CreateImageView(m_device, m_depthImage, m_depthFormat,
-                                VK_IMAGE_ASPECT_DEPTH_BIT);
-  if (!m_depthView) {
-    std::cerr << "Failed to create depth image view" << std::endl;
-    std::abort();
-  }
-}
-
-void Renderer::destroyColorResources() {
-  if (!m_device) {
-    return;
-  }
-
-  if (m_colorView) {
-    vkDestroyImageView(m_device, m_colorView, nullptr);
-    m_colorView = VK_NULL_HANDLE;
-  }
-  if (m_colorImage) {
-    vkDestroyImage(m_device, m_colorImage, nullptr);
-    m_colorImage = VK_NULL_HANDLE;
-  }
-  if (m_colorMemory) {
-    vkFreeMemory(m_device, m_colorMemory, nullptr);
-    m_colorMemory = VK_NULL_HANDLE;
-  }
-}
-
-void Renderer::destroyDepthResources() {
-  if (!m_device) {
-    return;
-  }
-
-  if (m_depthView) {
-    vkDestroyImageView(m_device, m_depthView, nullptr);
-    m_depthView = VK_NULL_HANDLE;
-  }
-  if (m_depthImage) {
-    vkDestroyImage(m_device, m_depthImage, nullptr);
-    m_depthImage = VK_NULL_HANDLE;
-  }
-  if (m_depthMemory) {
-    vkFreeMemory(m_device, m_depthMemory, nullptr);
-    m_depthMemory = VK_NULL_HANDLE;
-  }
-}
-
 void Renderer::createRenderPass() {
-  // VkAttachmentDescription color{};
-  // color.format = m_swapchainFormat;
-  // color.samples = m_sampleCount;
-  // color.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-  // color.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-  // color.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-  // color.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  // color.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  // color.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-  // VkAttachmentReference colorRef{};
-  // colorRef.attachment = 0;
-  // colorRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-  // VkAttachmentDescription depth{};
-  // depth.format = m_depthFormat;
-  // depth.samples = m_sampleCount;
-  // depth.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-  // depth.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  // depth.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-  // depth.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  // depth.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  // depth.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-  // VkAttachmentReference depthRef{};
-  // depthRef.attachment = 1;
-  // depthRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-  // VkSubpassDescription subpass{};
-  // subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-  // subpass.colorAttachmentCount = 1;
-  // subpass.pColorAttachments = &colorRef;
-  // subpass.pDepthStencilAttachment = &depthRef;
-
-  // VkSubpassDependency dep{};
-  // dep.srcSubpass = VK_SUBPASS_EXTERNAL;
-  // dep.dstSubpass = 0;
-  // dep.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
-  //                    VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-  // dep.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
-  //                    VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-  // dep.srcAccessMask = 0;
-  // dep.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
-  //                     VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-
-  // VkRenderPassCreateInfo renderPassCreateInfo{};
-  // renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-  // VkAttachmentDescription atts[2] = {color, depth};
-  // renderPassCreateInfo.pAttachments = atts;
-  // renderPassCreateInfo.subpassCount = 1;
-  // renderPassCreateInfo.pSubpasses = &subpass;
-  // renderPassCreateInfo.dependencyCount = 1;
-  // renderPassCreateInfo.pDependencies = &dep;
-
-  // if (m_sampleCount == VK_SAMPLE_COUNT_1_BIT) {
-  //   renderPassCreateInfo.attachmentCount = 2;
-  // } else {
-  //   renderPassCreateInfo.attachmentCount = 3;
-  // }
-
-  // VkResult r = vkCreateRenderPass(m_device, &renderPassCreateInfo, nullptr,
-  //                                 &m_renderPass);
-  // if (r != VK_SUCCESS) {
-  //   std::cerr << "vkCreateRenderPass failed: " << (int)r << std::endl;
-  //   std::abort();
-  // }
-
   VkSubpassDependency subpassDependency{};
   subpassDependency.srcSubpass = VK_SUBPASS_EXTERNAL;
   subpassDependency.dstSubpass = 0;
@@ -774,6 +685,64 @@ void Renderer::createRenderPass() {
   }
 }
 
+void Renderer::createColorResources() {
+  if (m_colorView) {
+    vkDestroyImageView(m_device, m_colorView, nullptr);
+    m_colorView = VK_NULL_HANDLE;
+  }
+
+  if (m_colorImage) {
+    vkDestroyImage(m_device, m_colorImage, nullptr);
+    m_colorImage = VK_NULL_HANDLE;
+  }
+
+  if (m_colorMemory) {
+    vkFreeMemory(m_device, m_colorMemory, nullptr);
+    m_colorMemory = VK_NULL_HANDLE;
+  }
+
+  if (m_sampleCount == VK_SAMPLE_COUNT_1_BIT) {
+    return; // no MSAA needed
+  }
+
+  if (!CreateImage2D(m_physicalDevice, m_device, m_sampleCount,
+                     m_swapchainExtent.width, m_swapchainExtent.height,
+                     m_swapchainFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                     m_colorImage, m_colorMemory)) {
+    std::cerr << "Failed to create MSAA color image" << std::endl;
+    std::abort();
+  }
+
+  m_colorView = CreateImageView(m_device, m_colorImage, m_swapchainFormat,
+                                VK_IMAGE_ASPECT_COLOR_BIT);
+
+  if (!m_colorView) {
+    std::cerr << "Failed to create MSAA color image view" << std::endl;
+    std::abort();
+  }
+}
+
+void Renderer::createDepthResources() {
+  if (m_depthView) {
+    destroyDepthResources();
+  }
+
+  if (!CreateImage2D(m_physicalDevice, m_device, m_sampleCount,
+                     m_swapchainExtent.width, m_swapchainExtent.height,
+                     m_depthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                     m_depthImage, m_depthMemory)) {
+    std::cerr << "Failed to create depth image" << std::endl;
+    std::abort();
+  }
+
+  m_depthView = CreateImageView(m_device, m_depthImage, m_depthFormat,
+                                VK_IMAGE_ASPECT_DEPTH_BIT);
+  if (!m_depthView) {
+    std::cerr << "Failed to create depth image view" << std::endl;
+    std::abort();
+  }
+}
+
 void Renderer::createFramebuffers() {
   m_framebuffers.resize(m_swapchainImageViews.size());
 
@@ -862,128 +831,6 @@ void Renderer::createSyncObjects() {
   }
 }
 
-void Renderer::destroySwapchain() {
-  destroyColorResources();
-  destroyDepthResources();
-
-  for (auto fb : m_framebuffers) {
-    vkDestroyFramebuffer(m_device, fb, nullptr);
-  }
-
-  m_framebuffers.clear();
-
-  if (m_renderPass) {
-    vkDestroyRenderPass(m_device, m_renderPass, nullptr);
-    m_renderPass = VK_NULL_HANDLE;
-  }
-
-  for (auto iv : m_swapchainImageViews) {
-    vkDestroyImageView(m_device, iv, nullptr);
-  }
-
-  m_swapchainImageViews.clear();
-  m_swapchainImages.clear();
-
-  if (m_swapchain) {
-    vkDestroySwapchainKHR(m_device, m_swapchain, nullptr);
-    m_swapchain = VK_NULL_HANDLE;
-  }
-}
-
-void Renderer::recreateSwapchainIfNeeded(Scene *scene) {
-  if (!m_swapchainDirty) {
-    return;
-  }
-
-  if (m_width <= 0 || m_height <= 0) {
-    return;
-  }
-
-  waitDeviceIdle();
-
-  // Pipeline depends on renderpass, which depends on swapchain format.
-  scene->destroyPipeline(*this);
-  destroySwapchain();
-
-  createSwapchain(m_width, m_height);
-  createSwapchainViews();
-  createRenderPass();
-  createColorResources();
-  createDepthResources();
-  createFramebuffers();
-  scene->createPipeline(*this);
-
-  m_swapchainDirty = false;
-}
-
-void Renderer::drawFrame(Scene *scene) {
-  if (!m_device) {
-    return;
-  }
-
-  recreateSwapchainIfNeeded(scene);
-
-  const int frameIndex = m_frameIndex;
-
-  vkWaitForFences(m_device, 1, &m_inFlight[frameIndex], VK_TRUE, UINT64_MAX);
-  vkResetFences(m_device, 1, &m_inFlight[frameIndex]);
-
-  uint32_t imageIndex = 0;
-  VkResult result = vkAcquireNextImageKHR(m_device, m_swapchain, UINT64_MAX,
-                                          m_imageAvailable[frameIndex],
-                                          VK_NULL_HANDLE, &imageIndex);
-
-  if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-    m_swapchainDirty = true;
-    return;
-  }
-  if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
-    std::cerr << "vkAcquireNextImageKHR failed: " << (int)result << std::endl;
-    std::abort();
-  }
-
-  vkResetCommandBuffer(m_cmd[frameIndex], 0);
-  recordCommandBuffer(m_cmd[frameIndex], imageIndex, scene);
-
-  VkPipelineStageFlags waitStage =
-      VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-
-  VkSubmitInfo submitInfo{};
-  submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-  submitInfo.waitSemaphoreCount = 1;
-  submitInfo.pWaitSemaphores = &m_imageAvailable[frameIndex];
-  submitInfo.pWaitDstStageMask = &waitStage;
-  submitInfo.commandBufferCount = 1;
-  submitInfo.pCommandBuffers = &m_cmd[frameIndex];
-  submitInfo.signalSemaphoreCount = 1;
-  submitInfo.pSignalSemaphores = &m_renderFinished[frameIndex];
-
-  result =
-      vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, m_inFlight[frameIndex]);
-  if (result != VK_SUCCESS) {
-    std::cerr << "vkQueueSubmit failed: " << (int)result << std::endl;
-    std::abort();
-  }
-
-  VkPresentInfoKHR presentInfo{};
-  presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-  presentInfo.waitSemaphoreCount = 1;
-  presentInfo.pWaitSemaphores = &m_renderFinished[frameIndex];
-  presentInfo.swapchainCount = 1;
-  presentInfo.pSwapchains = &m_swapchain;
-  presentInfo.pImageIndices = &imageIndex;
-
-  result = vkQueuePresentKHR(m_presentQueue, &presentInfo);
-  if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-    m_swapchainDirty = true;
-  } else if (result != VK_SUCCESS) {
-    std::cerr << "vkQueuePresentKHR failed: " << (int)result << std::endl;
-    std::abort();
-  }
-
-  m_frameIndex = (m_frameIndex + 1) % FRAME_COUNT;
-}
-
 void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex,
                                    Scene *scene) {
 
@@ -1003,23 +850,15 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex,
   renderPassBeginInfo.renderArea.offset = {0, 0};
   renderPassBeginInfo.renderArea.extent = m_swapchainExtent;
 
-  // VkClearValue clears[2]{};
-  // // A pleasant “evergreen-ish” clear.
-  // clears[0].color.float32[0] = 0.10f;
-  // clears[0].color.float32[1] = 0.16f;
-  // clears[0].color.float32[2] = 0.18f;
-  // clears[0].color.float32[3] = 1.0f;
-  // clears[1].depthStencil.depth = 1.0f;
-  // clears[1].depthStencil.stencil = 0;
-
   if (m_sampleCount == VK_SAMPLE_COUNT_1_BIT) {
     VkClearValue clears[2]{};
 
     // A pleasant “evergreen-ish” clear.
-    clears[0].color.float32[0] = 0.10f;
-    clears[0].color.float32[1] = 0.16f;
-    clears[0].color.float32[2] = 0.18f;
+    clears[0].color.float32[0] = m_clearColor[0];
+    clears[0].color.float32[1] = m_clearColor[1];
+    clears[0].color.float32[2] = m_clearColor[2];
     clears[0].color.float32[3] = 1.0f;
+
     clears[1].depthStencil.depth = 1.0f;
     clears[1].depthStencil.stencil = 0;
 
@@ -1029,9 +868,9 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex,
     VkClearValue clears[3]{};
 
     // A pleasant “evergreen-ish” clear.
-    clears[0].color.float32[0] = 0.10f;
-    clears[0].color.float32[1] = 0.16f;
-    clears[0].color.float32[2] = 0.18f;
+    clears[0].color.float32[0] = m_clearColor[0];
+    clears[0].color.float32[1] = m_clearColor[1];
+    clears[0].color.float32[2] = m_clearColor[2];
     clears[0].color.float32[3] = 1.0f;
 
     clears[2].depthStencil.depth = 1.0f;
@@ -1075,4 +914,101 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex,
   vkCmdEndRenderPass(cmd);
 
   vkEndCommandBuffer(cmd);
+}
+
+void Renderer::waitDeviceIdle() {
+  if (m_device)
+    vkDeviceWaitIdle(m_device);
+}
+
+void Renderer::recreateSwapchainIfNeeded(Scene *scene) {
+  if (!m_swapchainDirty) {
+    return;
+  }
+
+  if (m_width <= 0 || m_height <= 0) {
+    return;
+  }
+
+  waitDeviceIdle();
+
+  // Pipeline depends on renderpass, which depends on swapchain format.
+  scene->destroyPipeline(*this);
+  destroySwapchain();
+
+  createSwapchain(m_width, m_height);
+  createSwapchainViews();
+  createRenderPass();
+  createColorResources();
+  createDepthResources();
+  createFramebuffers();
+  scene->createPipeline(*this);
+
+  m_swapchainDirty = false;
+}
+
+void Renderer::destroySwapchain() {
+  destroyColorResources();
+  destroyDepthResources();
+
+  for (auto fb : m_framebuffers) {
+    vkDestroyFramebuffer(m_device, fb, nullptr);
+  }
+
+  m_framebuffers.clear();
+
+  if (m_renderPass) {
+    vkDestroyRenderPass(m_device, m_renderPass, nullptr);
+    m_renderPass = VK_NULL_HANDLE;
+  }
+
+  for (auto iv : m_swapchainImageViews) {
+    vkDestroyImageView(m_device, iv, nullptr);
+  }
+
+  m_swapchainImageViews.clear();
+  m_swapchainImages.clear();
+
+  if (m_swapchain) {
+    vkDestroySwapchainKHR(m_device, m_swapchain, nullptr);
+    m_swapchain = VK_NULL_HANDLE;
+  }
+}
+
+void Renderer::destroyColorResources() {
+  if (!m_device) {
+    return;
+  }
+
+  if (m_colorView) {
+    vkDestroyImageView(m_device, m_colorView, nullptr);
+    m_colorView = VK_NULL_HANDLE;
+  }
+  if (m_colorImage) {
+    vkDestroyImage(m_device, m_colorImage, nullptr);
+    m_colorImage = VK_NULL_HANDLE;
+  }
+  if (m_colorMemory) {
+    vkFreeMemory(m_device, m_colorMemory, nullptr);
+    m_colorMemory = VK_NULL_HANDLE;
+  }
+}
+
+void Renderer::destroyDepthResources() {
+  if (!m_device) {
+    return;
+  }
+
+  if (m_depthView) {
+    vkDestroyImageView(m_device, m_depthView, nullptr);
+    m_depthView = VK_NULL_HANDLE;
+  }
+  if (m_depthImage) {
+    vkDestroyImage(m_device, m_depthImage, nullptr);
+    m_depthImage = VK_NULL_HANDLE;
+  }
+  if (m_depthMemory) {
+    vkFreeMemory(m_device, m_depthMemory, nullptr);
+    m_depthMemory = VK_NULL_HANDLE;
+  }
 }

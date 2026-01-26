@@ -5,8 +5,10 @@
 Engine::~Engine() { shutdown(); }
 
 bool Engine::init() {
-  const int startW = 800;
-  const int startH = 600;
+  // const int startW = 800;
+  // const int startH = 600;
+  const int startW = 1600;
+  const int startH = 1200;
 
   if (!m_window.init("evergreen", startW, startH)) {
     return false;
@@ -43,7 +45,7 @@ void Engine::run() {
     tick();
 
     if (m_window.wasResized()) {
-      m_renderer.onResize(m_window.width(), m_window.height());
+      m_renderer.resize(m_window.width(), m_window.height());
       m_scene.get()->resize(m_window.width(), m_window.height());
 
       m_window.clearResizedFlag();

@@ -1,10 +1,10 @@
 #pragma once
 
-#include "../Camera.hpp"
-#include "../Constants.hpp"
-#include "../Dimensions.hpp"
-#include "../Platform.hpp"
-#include "../Scene.hpp"
+#include "Camera.hpp"
+#include "Constants.hpp"
+#include "Dimensions.hpp"
+#include "Platform.hpp"
+#include "Scene.hpp"
 
 #include <vulkan/vulkan.h>
 
@@ -15,7 +15,7 @@
 class Renderer {
 public:
   Renderer() = default;
-  ~Renderer();
+  ~Renderer() = default;
 
   Renderer(const Renderer &) = delete;
   Renderer &operator=(const Renderer &) = delete;
@@ -23,21 +23,14 @@ public:
   bool init(const Win32WindowHandles &windowHandler, int width, int height,
             bool enableValidation);
 
-  int frameIndex() { return m_frameIndex; };
+  int frameIndex();
+  Dimensions dimensions();
+  VkPhysicalDevice physicalDevice();
+  VkDevice device();
+  VkSampleCountFlagBits sampleCount();
+  VkRenderPass renderPass();
 
-  Dimensions getDimensions() {
-    return Dimensions{(float)m_width, (float)m_height};
-  };
-
-  VkPhysicalDevice getPhysicalDevice() { return m_physicalDevice; }
-
-  VkDevice getDevice() { return m_device; }
-
-  VkSampleCountFlagBits getSampleCount() { return m_sampleCount; }
-
-  VkRenderPass getRenderPass() { return m_renderPass; }
-
-  void onResize(int width, int height);
+  void resize(int width, int height);
   void update(float deltaTime);
   void drawFrame(Scene *scene);
 
@@ -49,10 +42,11 @@ private:
   int m_width = 0;
   int m_height = 0;
 
+  std::array<float, 3> m_clearColor = {0.0, 0.0, 0.0}; // {0.10, 0.16, 0.18};
+
   VkInstance m_instance = VK_NULL_HANDLE;
 
   VkSampleCountFlagBits m_sampleCount = VK_SAMPLE_COUNT_1_BIT;
-  // VK_SAMPLE_COUNT_4_BIT; //
 
   VkDebugUtilsMessengerEXT m_debugMessenger = VK_NULL_HANDLE;
 
@@ -109,14 +103,14 @@ private:
   void createCommandBuffers();
   void createSyncObjects();
 
+  void recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex,
+                           Scene *scene);
+
+  void waitDeviceIdle();
+
   void recreateSwapchainIfNeeded(Scene *scene);
 
   void destroySwapchain();
   void destroyColorResources();
   void destroyDepthResources();
-
-  void recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex,
-                           Scene *scene);
-
-  void waitDeviceIdle();
 };

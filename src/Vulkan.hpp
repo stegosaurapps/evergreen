@@ -24,6 +24,8 @@
 #include <set>
 #include <vector>
 
+static const char *kValidationLayer = "VK_LAYER_KHRONOS_validation";
+
 static uint32_t FindMemoryType(VkPhysicalDevice pd, uint32_t typeFilter,
                                VkMemoryPropertyFlags props) {
   VkPhysicalDeviceMemoryProperties mp{};
@@ -141,8 +143,6 @@ static bool ReadFileBytes(const char *path, std::vector<char> &out) {
   f.close();
   return true;
 }
-
-static const char *kValidationLayer = "VK_LAYER_KHRONOS_validation";
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
     VkDebugUtilsMessageSeverityFlagBitsEXT severity,
@@ -282,4 +282,16 @@ static VkExtent2D ChooseExtent(const VkSurfaceCapabilitiesKHR &caps, int w,
                                   (int)caps.maxImageExtent.height);
 
   return e;
+}
+
+static VkShaderModule CreateShaderModule(VkDevice dev,
+                                         const std::vector<char> &bytes) {
+  VkShaderModuleCreateInfo ci{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
+  ci.codeSize = bytes.size();
+  ci.pCode = reinterpret_cast<const uint32_t *>(bytes.data());
+  VkShaderModule mod = VK_NULL_HANDLE;
+  if (vkCreateShaderModule(dev, &ci, nullptr, &mod) != VK_SUCCESS) {
+    return VK_NULL_HANDLE;
+  }
+  return mod;
 }

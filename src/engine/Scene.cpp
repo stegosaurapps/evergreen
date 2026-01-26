@@ -1,7 +1,8 @@
 #include "Scene.hpp"
 
-#include "renderer/Helpers.hpp"
-#include "renderer/Renderer.hpp"
+#include "../Vulkan.hpp"
+
+#include "Renderer.hpp"
 
 #include <iostream>
 
@@ -20,7 +21,7 @@ void Scene::init(Renderer &renderer, Camera camera,
 
 void Scene::update(Renderer &renderer, float deltaTime) {
   // orbit update (camera owns orbit state)
-  m_camera.orbitStep(deltaTime);
+  m_camera.orbitStep(deltaTime, 0.2);
 
   // Keep camera current (aspect updates on resize handled in onResize).
   m_camera.updateMatrices();
@@ -90,7 +91,7 @@ VkBuffer *Scene::indexBuffer() { return &m_indexBuffer; }
 VkDeviceMemory *Scene::indexMemory() { return &m_indexMemory; }
 
 void Scene::destroyResources(Renderer &renderer) {
-  auto device = renderer.getDevice();
+  auto device = renderer.device();
 
   if (!device) {
     return;

@@ -1,14 +1,13 @@
 #pragma once
 
-#include "Helpers.hpp"
+#include "../Vulkan.hpp"
 
 #include "../engine/Camera.hpp"
 #include "../engine/Cube.hpp"
 #include "../engine/Dimensions.hpp"
 #include "../engine/Renderable.hpp"
+#include "../engine/Renderer.hpp"
 #include "../engine/Scene.hpp"
-
-#include "../engine/renderer/Renderer.hpp"
 
 #include <memory>
 #include <vector>
@@ -26,19 +25,23 @@ Camera createCamera(Dimensions dimensions) {
 }
 
 void createDescriptorSetLayout(Renderer &renderer, Scene *scene) {
-  VkDescriptorSetLayoutBinding cam{};
-  cam.binding = 0;
-  cam.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  cam.descriptorCount = 1;
-  cam.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+  auto device = renderer.device();
 
-  VkDescriptorSetLayoutCreateInfo createInfo{
+  VkDescriptorSetLayoutBinding descriptorSetLayoutBinding{};
+  descriptorSetLayoutBinding.binding = 0;
+  descriptorSetLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  descriptorSetLayoutBinding.descriptorCount = 1;
+  descriptorSetLayoutBinding.stageFlags =
+      VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+
+  VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{
       VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
-  createInfo.bindingCount = 1;
-  createInfo.pBindings = &cam;
+  descriptorSetLayoutCreateInfo.bindingCount = 1;
+  descriptorSetLayoutCreateInfo.pBindings = &descriptorSetLayoutBinding;
 
-  auto result = vkCreateDescriptorSetLayout(
-      renderer.getDevice(), &createInfo, nullptr, scene->descriptorSetLayout());
+  auto result =
+      vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo,
+                                  nullptr, scene->descriptorSetLayout());
   if (result != VK_SUCCESS) {
     std::cerr << "vkCreateDescriptorSetLayout failed" << std::endl;
     std::abort();
@@ -46,7 +49,7 @@ void createDescriptorSetLayout(Renderer &renderer, Scene *scene) {
 }
 
 void createDescriptorPool(Renderer &renderer, Scene *scene) {
-  auto device = renderer.getDevice();
+  auto device = renderer.device();
 
   auto descriptorSetLayout = scene->descriptorSetLayout();
   auto descriptorPool = scene->descriptorPool();
@@ -56,46 +59,45 @@ void createDescriptorPool(Renderer &renderer, Scene *scene) {
   descriptorPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
   descriptorPoolSize.descriptorCount = FRAME_COUNT;
 
-  VkDescriptorPoolCreateInfo createInfo{
+  VkDescriptorPoolCreateInfo descriptorPoolCreateInfo{
       VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
-  createInfo.maxSets = FRAME_COUNT;
-  createInfo.poolSizeCount = 1;
-  createInfo.pPoolSizes = &descriptorPoolSize;
+  descriptorPoolCreateInfo.maxSets = FRAME_COUNT;
+  descriptorPoolCreateInfo.poolSizeCount = 1;
+  descriptorPoolCreateInfo.pPoolSizes = &descriptorPoolSize;
 
-  auto result =
-      vkCreateDescriptorPool(device, &createInfo, nullptr, descriptorPool);
+  auto result = vkCreateDescriptorPool(device, &descriptorPoolCreateInfo,
+                                       nullptr, descriptorPool);
   if (result != VK_SUCCESS) {
     std::cerr << "vkCreateDescriptorPool failed" << std::endl;
     std::abort();
   }
 
-  std::array<VkDescriptorSetLayout, FRAME_COUNT> layouts;
+  std::array<VkDescriptorSetLayout, FRAME_COUNT> descriptorSetLayouts;
   for (int i = 0; i < FRAME_COUNT; ++i) {
-    layouts[i] = *descriptorSetLayout;
+    descriptorSetLayouts[i] = *descriptorSetLayout;
   }
 
-  VkDescriptorSetAllocateInfo allocateInfo{
+  VkDescriptorSetAllocateInfo descriptorSetAllocateInfo{
       VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
-  allocateInfo.descriptorPool = *descriptorPool;
-  allocateInfo.descriptorSetCount = FRAME_COUNT;
-  allocateInfo.pSetLayouts = layouts.data();
+  descriptorSetAllocateInfo.descriptorPool = *descriptorPool;
+  descriptorSetAllocateInfo.descriptorSetCount = FRAME_COUNT;
+  descriptorSetAllocateInfo.pSetLayouts = descriptorSetLayouts.data();
 
-  if (vkAllocateDescriptorSets(device, &allocateInfo, descriptorSets->data()) !=
-      VK_SUCCESS) {
+  if (vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo,
+                               descriptorSets->data()) != VK_SUCCESS) {
     std::cerr << "vkAllocateDescriptorSets failed" << std::endl;
     std::abort();
   }
 }
 
 void createPipeline(Renderer &renderer, Scene *scene) {
-  auto device = renderer.getDevice();
+  auto device = renderer.device();
 
   auto pipelineLayout = scene->pipelineLayout();
   auto pipeline = scene->pipeline();
 
   auto descriptorSetLayout = scene->descriptorSetLayout();
 
-  // Destroy old pipeline and layout if rebuilding (swapchain resize).
   if (*pipeline) {
     vkDestroyPipeline(device, *pipeline, nullptr);
     *pipeline = VK_NULL_HANDLE;
@@ -109,165 +111,188 @@ void createPipeline(Renderer &renderer, Scene *scene) {
   std::vector<char> vsBytes;
   std::vector<char> fsBytes;
 
-  if (!ReadFileBytes("shaders/test.vert.spv", vsBytes) ||
-      !ReadFileBytes("shaders/test.frag.spv", fsBytes)) {
-    std::cerr << "Missing shaders. Build will generate shaders/test.*.spv (via "
-                 "glslc)."
-              << std::endl;
+  if (!ReadFileBytes("shaders/test.vert.spv", vsBytes)) {
+    std::cerr << "Missing vertex shader shaders/test.vert.spv" << std::endl;
+    std::abort();
+  }
+
+  if (!ReadFileBytes("shaders/test.frag.spv", fsBytes)) {
+    std::cerr << "Missing fragment shader shaders/test.frag.spv" << std::endl;
     std::abort();
   }
 
   VkShaderModule vs = CreateShaderModule(device, vsBytes);
-  VkShaderModule fs = CreateShaderModule(device, fsBytes);
-  if (!vs || !fs) {
-    std::cerr << "Failed to create shader modules" << std::endl;
+  if (!vs) {
+    std::cerr << "Failed to create vertex shader module" << std::endl;
     std::abort();
   }
 
-  VkPipelineShaderStageCreateInfo stages[2]{};
-  stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-  stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-  stages[0].module = vs;
-  stages[0].pName = "main";
-  stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-  stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-  stages[1].module = fs;
-  stages[1].pName = "main";
+  VkShaderModule fs = CreateShaderModule(device, fsBytes);
+  if (!fs) {
+    std::cerr << "Failed to create fragment shader module" << std::endl;
+    std::abort();
+  }
+
+  VkPipelineShaderStageCreateInfo pipelineShaderStageCreateInfo[2]{};
+  pipelineShaderStageCreateInfo[0].sType =
+      VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+  pipelineShaderStageCreateInfo[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+  pipelineShaderStageCreateInfo[0].module = vs;
+  pipelineShaderStageCreateInfo[0].pName = "main";
+  pipelineShaderStageCreateInfo[1].sType =
+      VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+  pipelineShaderStageCreateInfo[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+  pipelineShaderStageCreateInfo[1].module = fs;
+  pipelineShaderStageCreateInfo[1].pName = "main";
 
   // Vertex input
-  VkVertexInputBindingDescription bind{};
-  bind.binding = 0;
-  bind.stride = sizeof(VertexPCN);
-  bind.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+  VkVertexInputBindingDescription vertexInputBindingDescription{};
+  vertexInputBindingDescription.binding = 0;
+  vertexInputBindingDescription.stride = sizeof(VertexPCN);
+  vertexInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-  VkVertexInputAttributeDescription attrs[3]{};
+  VkVertexInputAttributeDescription vertexInputAttributeDescription[3]{};
 
   // position
-  attrs[0].location = 0;
-  attrs[0].binding = 0;
-  attrs[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-  attrs[0].offset = offsetof(VertexPCN, px);
+  vertexInputAttributeDescription[0].location = 0;
+  vertexInputAttributeDescription[0].binding = 0;
+  vertexInputAttributeDescription[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+  vertexInputAttributeDescription[0].offset = offsetof(VertexPCN, px);
 
   // normal
-  attrs[1].location = 1;
-  attrs[1].binding = 0;
-  attrs[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-  attrs[1].offset = offsetof(VertexPCN, nx);
+  vertexInputAttributeDescription[1].location = 1;
+  vertexInputAttributeDescription[1].binding = 0;
+  vertexInputAttributeDescription[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+  vertexInputAttributeDescription[1].offset = offsetof(VertexPCN, nx);
 
   // color
-  attrs[2].location = 2;
-  attrs[2].binding = 0;
-  attrs[2].format = VK_FORMAT_R32G32B32_SFLOAT;
-  attrs[2].offset = offsetof(VertexPCN, r);
+  vertexInputAttributeDescription[2].location = 2;
+  vertexInputAttributeDescription[2].binding = 0;
+  vertexInputAttributeDescription[2].format = VK_FORMAT_R32G32B32_SFLOAT;
+  vertexInputAttributeDescription[2].offset = offsetof(VertexPCN, r);
 
-  VkPipelineVertexInputStateCreateInfo vi{
+  VkPipelineVertexInputStateCreateInfo pipelineVertexInputStateCreateInfo{
       VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
-  vi.vertexBindingDescriptionCount = 1;
-  vi.pVertexBindingDescriptions = &bind;
-  vi.vertexAttributeDescriptionCount = 3;
-  vi.pVertexAttributeDescriptions = attrs;
+  pipelineVertexInputStateCreateInfo.vertexBindingDescriptionCount = 1;
+  pipelineVertexInputStateCreateInfo.pVertexBindingDescriptions =
+      &vertexInputBindingDescription;
+  pipelineVertexInputStateCreateInfo.vertexAttributeDescriptionCount = 3;
+  pipelineVertexInputStateCreateInfo.pVertexAttributeDescriptions =
+      vertexInputAttributeDescription;
 
-  VkPipelineInputAssemblyStateCreateInfo ia{
+  VkPipelineInputAssemblyStateCreateInfo pipelineInputAsseblyStateCreateInfo{
       VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
-  ia.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-  ia.primitiveRestartEnable = VK_FALSE;
+  pipelineInputAsseblyStateCreateInfo.topology =
+      VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+  pipelineInputAsseblyStateCreateInfo.primitiveRestartEnable = VK_FALSE;
 
-  VkPipelineViewportStateCreateInfo vp{
+  VkPipelineViewportStateCreateInfo pipelineViewportStateCreateInfo{
       VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO};
-  vp.viewportCount = 1;
-  vp.scissorCount = 1;
+  pipelineViewportStateCreateInfo.viewportCount = 1;
+  pipelineViewportStateCreateInfo.scissorCount = 1;
 
-  VkPipelineRasterizationStateCreateInfo rs{
+  VkPipelineRasterizationStateCreateInfo pipelineRasterizationStateCreateInfo{
       VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO};
-  rs.polygonMode = VK_POLYGON_MODE_FILL;
-  rs.cullMode = VK_CULL_MODE_BACK_BIT;
-  rs.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-  rs.lineWidth = 1.0f;
-  rs.cullMode = VK_CULL_MODE_NONE;
+  pipelineRasterizationStateCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;
+  pipelineRasterizationStateCreateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
+  pipelineRasterizationStateCreateInfo.frontFace =
+      VK_FRONT_FACE_COUNTER_CLOCKWISE;
+  pipelineRasterizationStateCreateInfo.lineWidth = 1.0f;
+  pipelineRasterizationStateCreateInfo.cullMode = VK_CULL_MODE_NONE;
 
-  VkPipelineMultisampleStateCreateInfo ms{
+  VkPipelineMultisampleStateCreateInfo pipelineMultisampleStateCreateInfo{
       VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
-  ms.rasterizationSamples = renderer.getSampleCount();
+  pipelineMultisampleStateCreateInfo.rasterizationSamples =
+      renderer.sampleCount();
 
-  VkPipelineDepthStencilStateCreateInfo ds{
+  VkPipelineDepthStencilStateCreateInfo pipelineDepthStencilStateCreateInfo{
       VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
-  ds.depthTestEnable = VK_TRUE;
-  ds.depthWriteEnable = VK_TRUE;
-  ds.depthCompareOp = VK_COMPARE_OP_LESS;
+  pipelineDepthStencilStateCreateInfo.depthTestEnable = VK_TRUE;
+  pipelineDepthStencilStateCreateInfo.depthWriteEnable = VK_TRUE;
+  pipelineDepthStencilStateCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS;
 
-  VkPipelineColorBlendAttachmentState cba{};
-  cba.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                       VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-  cba.blendEnable = VK_FALSE;
+  VkPipelineColorBlendAttachmentState pipelineColorBlendAttachmentState{};
+  pipelineColorBlendAttachmentState.colorWriteMask =
+      VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+      VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+  pipelineColorBlendAttachmentState.blendEnable = VK_FALSE;
 
-  VkPipelineColorBlendStateCreateInfo cb{
+  VkPipelineColorBlendStateCreateInfo pipelineColorBlendStateCreateInfo{
       VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
-  cb.attachmentCount = 1;
-  cb.pAttachments = &cba;
+  pipelineColorBlendStateCreateInfo.attachmentCount = 1;
+  pipelineColorBlendStateCreateInfo.pAttachments =
+      &pipelineColorBlendAttachmentState;
 
-  VkDynamicState dynStates[] = {VK_DYNAMIC_STATE_VIEWPORT,
-                                VK_DYNAMIC_STATE_SCISSOR};
-  VkPipelineDynamicStateCreateInfo dyn{
+  VkDynamicState dynamicStates[] = {VK_DYNAMIC_STATE_VIEWPORT,
+                                    VK_DYNAMIC_STATE_SCISSOR};
+  VkPipelineDynamicStateCreateInfo pipelineDynamicStateCreateInfo{
       VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
-  dyn.dynamicStateCount = 2;
-  dyn.pDynamicStates = dynStates;
+  pipelineDynamicStateCreateInfo.dynamicStateCount = 2;
+  pipelineDynamicStateCreateInfo.pDynamicStates = dynamicStates;
 
   // Push constant = model matrix.
-  VkPushConstantRange pcr{};
-  pcr.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-  pcr.offset = 0;
-  pcr.size = sizeof(Mat4);
+  VkPushConstantRange pushConstantRange{};
+  pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+  pushConstantRange.offset = 0;
+  pushConstantRange.size = sizeof(Mat4);
 
   if (*descriptorSetLayout == VK_NULL_HANDLE) {
     std::cerr << "createPipeline: m_setLayoutFrame is VK_NULL_HANDLE "
                  "(descriptor set layout missing)\n";
   }
 
-  VkPipelineLayoutCreateInfo pl{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
-  pl.setLayoutCount = 1;
-  pl.pSetLayouts = descriptorSetLayout;
-  pl.pushConstantRangeCount = 1;
-  pl.pPushConstantRanges = &pcr;
+  VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{
+      VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+  pipelineLayoutCreateInfo.setLayoutCount = 1;
+  pipelineLayoutCreateInfo.pSetLayouts = descriptorSetLayout;
+  pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
+  pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
 
-  if (vkCreatePipelineLayout(device, &pl, nullptr, pipelineLayout) !=
-      VK_SUCCESS) {
+  if (vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr,
+                             pipelineLayout) != VK_SUCCESS) {
     std::cerr << "vkCreatePipelineLayout failed\n";
     vkDestroyShaderModule(device, vs, nullptr);
     vkDestroyShaderModule(device, fs, nullptr);
     std::abort();
   }
 
-  VkPipelineRenderingCreateInfoKHR rendering{};
+  VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo{};
+  graphicsPipelineCreateInfo.sType =
+      VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+  graphicsPipelineCreateInfo.pNext = nullptr;
 
-  VkGraphicsPipelineCreateInfo pci{};
-  pci.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-  pci.pNext = nullptr;
+  graphicsPipelineCreateInfo.stageCount = 2;
+  graphicsPipelineCreateInfo.pStages = pipelineShaderStageCreateInfo;
 
-  pci.stageCount = 2;
-  pci.pStages = stages;
+  graphicsPipelineCreateInfo.pVertexInputState =
+      &pipelineVertexInputStateCreateInfo;
+  graphicsPipelineCreateInfo.pInputAssemblyState =
+      &pipelineInputAsseblyStateCreateInfo;
+  graphicsPipelineCreateInfo.pViewportState = &pipelineViewportStateCreateInfo;
+  graphicsPipelineCreateInfo.pRasterizationState =
+      &pipelineRasterizationStateCreateInfo;
+  graphicsPipelineCreateInfo.pMultisampleState =
+      &pipelineMultisampleStateCreateInfo;
+  graphicsPipelineCreateInfo.pDepthStencilState =
+      &pipelineDepthStencilStateCreateInfo;
+  graphicsPipelineCreateInfo.pColorBlendState =
+      &pipelineColorBlendStateCreateInfo;
+  graphicsPipelineCreateInfo.pDynamicState = &pipelineDynamicStateCreateInfo;
 
-  pci.pVertexInputState = &vi;
-  pci.pInputAssemblyState = &ia;
-  pci.pViewportState = &vp;
-  pci.pRasterizationState = &rs;
-  pci.pMultisampleState = &ms;
-  pci.pDepthStencilState = &ds;
-  pci.pColorBlendState = &cb;
-  pci.pDynamicState = &dyn;
-
-  pci.layout = *pipelineLayout;
-  pci.renderPass = renderer.getRenderPass();
-  pci.subpass = 0;
+  graphicsPipelineCreateInfo.layout = *pipelineLayout;
+  graphicsPipelineCreateInfo.renderPass = renderer.renderPass();
+  graphicsPipelineCreateInfo.subpass = 0;
 
   // Optional but commonly set:
-  pci.basePipelineHandle = VK_NULL_HANDLE;
-  pci.basePipelineIndex = -1;
+  graphicsPipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
+  graphicsPipelineCreateInfo.basePipelineIndex = -1;
 
-  if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pci, nullptr,
+  if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1,
+                                &graphicsPipelineCreateInfo, nullptr,
                                 pipeline) != VK_SUCCESS) {
-    std::cerr << "vkCreateGraphicsPipelines failed\n";
     vkDestroyShaderModule(device, vs, nullptr);
     vkDestroyShaderModule(device, fs, nullptr);
+    std::cerr << "vkCreateGraphicsPipelines failed\n";
     std::abort();
   }
 
@@ -276,7 +301,7 @@ void createPipeline(Renderer &renderer, Scene *scene) {
 }
 
 void destroyPipeline(Renderer &renderer, Scene *scene) {
-  auto device = renderer.getDevice();
+  auto device = renderer.device();
 
   auto pipelineLayout = scene->pipelineLayout();
   auto pipeline = scene->pipeline();
@@ -300,7 +325,7 @@ void destroyPipeline(Renderer &renderer, Scene *scene) {
 }
 
 void createUniformBuffers(Renderer &renderer, Scene *scene) {
-  auto device = renderer.getDevice();
+  auto device = renderer.device();
 
   auto uboBufferList = scene->uboBufferList();
   auto uboMemoryList = scene->uboMemoryList();
@@ -309,7 +334,7 @@ void createUniformBuffers(Renderer &renderer, Scene *scene) {
   auto descriptorSets = scene->descriptorSets();
 
   for (int i = 0; i < FRAME_COUNT; ++i) {
-    if (!CreateBuffer(renderer.getPhysicalDevice(), device, sizeof(CameraUBO),
+    if (!CreateBuffer(renderer.physicalDevice(), device, sizeof(CameraUBO),
                       VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                           VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -342,8 +367,8 @@ void createUniformBuffers(Renderer &renderer, Scene *scene) {
 }
 
 void createMesh(Renderer &renderer, Scene *scene) {
-  auto physicalDevice = renderer.getPhysicalDevice();
-  auto device = renderer.getDevice();
+  auto physicalDevice = renderer.physicalDevice();
+  auto device = renderer.device();
 
   std::vector<VertexPCN> verts;
   std::vector<uint32_t> idx;
@@ -352,16 +377,10 @@ void createMesh(Renderer &renderer, Scene *scene) {
 
   *scene->indexCount() = (uint32_t)idx.size();
 
-  // uint32_t IndexCount = (uint32_t)idx.size();
-  // VkBuffer vertexBuffer = VK_NULL_HANDLE;
-  // VkDeviceMemory vertexMemory = VK_NULL_HANDLE;
-  // VkBuffer indexBuffer = VK_NULL_HANDLE;
-  // VkDeviceMemory indexMemory = VK_NULL_HANDLE;
+  const VkDeviceSize vertexBufferSize = sizeof(VertexPCN) * verts.size();
+  const VkDeviceSize indexBufferSize = sizeof(uint32_t) * idx.size();
 
-  const VkDeviceSize vbSize = sizeof(VertexPCN) * verts.size();
-  const VkDeviceSize ibSize = sizeof(uint32_t) * idx.size();
-
-  if (!CreateBuffer(physicalDevice, device, vbSize,
+  if (!CreateBuffer(physicalDevice, device, vertexBufferSize,
                     VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -370,7 +389,7 @@ void createMesh(Renderer &renderer, Scene *scene) {
     std::abort();
   }
 
-  if (!CreateBuffer(physicalDevice, device, ibSize,
+  if (!CreateBuffer(physicalDevice, device, indexBufferSize,
                     VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -379,14 +398,13 @@ void createMesh(Renderer &renderer, Scene *scene) {
     std::abort();
   }
 
-  // Upload
-  void *p = nullptr;
-  vkMapMemory(device, *scene->vertexMemory(), 0, vbSize, 0, &p);
-  std::memcpy(p, verts.data(), (size_t)vbSize);
+  void *data = nullptr;
+  vkMapMemory(device, *scene->vertexMemory(), 0, vertexBufferSize, 0, &data);
+  std::memcpy(data, verts.data(), (size_t)vertexBufferSize);
   vkUnmapMemory(device, *scene->vertexMemory());
 
-  vkMapMemory(device, *scene->indexMemory(), 0, ibSize, 0, &p);
-  std::memcpy(p, idx.data(), (size_t)ibSize);
+  vkMapMemory(device, *scene->indexMemory(), 0, indexBufferSize, 0, &data);
+  std::memcpy(data, idx.data(), (size_t)indexBufferSize);
   vkUnmapMemory(device, *scene->indexMemory());
 
   std::cout << "Cube verts=" << verts.size() << " idx=" << idx.size()
@@ -403,65 +421,18 @@ Scene LoadScene(Renderer &renderer) {
   // Next create uniform buffers
   createUniformBuffers(renderer, &scene);
 
-  // // Next Pipeline can be created
-  // createPipeline(renderer, &scene);
-
   // Finally create renderable
   createMesh(renderer, &scene);
 
   // TODO: Setup Renderables
   std::vector<Renderable> renderables{};
 
-  auto camera = createCamera(renderer.getDimensions());
+  auto camera = createCamera(renderer.dimensions());
 
   scene.init(renderer, camera, renderables, createPipeline, destroyPipeline);
 
   return scene;
 }
-
-// void Renderer::createCubeMesh() {
-//   std::vector<VertexPCN> verts;
-//   std::vector<uint32_t> idx;
-
-//   BuildCube(verts, idx);
-
-//   m_cubeIndexCount = (uint32_t)idx.size();
-
-//   const VkDeviceSize vbSize = sizeof(VertexPCN) * verts.size();
-//   const VkDeviceSize ibSize = sizeof(uint32_t) * idx.size();
-
-//   // For now: simplest path, host-visible buffers (fine for a test cube).
-//   if (!CreateBuffer(m_physicalDevice, m_device, vbSize,
-//                     VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-//                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-//                         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-//                     m_cubeVB, m_cubeVBMem)) {
-//     std::cerr << "Failed to create cube VB\n";
-//     std::abort();
-//   }
-
-//   if (!CreateBuffer(m_physicalDevice, m_device, ibSize,
-//                     VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-//                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-//                         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-//                     m_cubeIB, m_cubeIBMem)) {
-//     std::cerr << "Failed to create cube IB\n";
-//     std::abort();
-//   }
-
-//   // Upload
-//   void *p = nullptr;
-//   vkMapMemory(m_device, m_cubeVBMem, 0, vbSize, 0, &p);
-//   std::memcpy(p, verts.data(), (size_t)vbSize);
-//   vkUnmapMemory(m_device, m_cubeVBMem);
-
-//   vkMapMemory(m_device, m_cubeIBMem, 0, ibSize, 0, &p);
-//   std::memcpy(p, idx.data(), (size_t)ibSize);
-//   vkUnmapMemory(m_device, m_cubeIBMem);
-
-//   std::cout << "Cube verts=" << verts.size() << " idx=" << idx.size()
-//             << std::endl;
-// }
 
 // void Renderer::createMeshBuffers() {
 //   // Build a single triangle in the scene. You'll replace this with a real

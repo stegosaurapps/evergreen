@@ -1,9 +1,8 @@
 #pragma once
 
+#include "Renderer.hpp"
 #include "Scene.hpp"
 #include "Window.hpp"
-
-#include "renderer/Renderer.hpp"
 
 #include <memory>
 
