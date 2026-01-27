@@ -3,8 +3,7 @@
 #include "Camera.hpp"
 #include "Constants.hpp"
 #include "Mesh.hpp"
-#include "Renderable.hpp"
-// #include "Renderer.hpp"
+#include "Model.hpp"
 #include "Transform.hpp"
 #include "Vertex.hpp"
 
@@ -20,10 +19,9 @@ class Renderer; // forward declaration
 class Scene {
 public:
   Scene() = default;
-  ~Scene();
+  ~Scene() = default;
 
-  void init(Renderer &renderer, Camera camera,
-            std::vector<Renderable> renderables,
+  void init(Renderer &renderer, Camera camera, std::vector<Model> models,
             std::function<void(Renderer &, Scene *)> createPipeline,
             std::function<void(Renderer &, Scene *)> destroyPipeline);
   void update(Renderer &renderer, float deltaTime);
@@ -35,8 +33,8 @@ public:
   void attachCamera(Camera camera);
   Camera &camera();
 
-  void addRenderable(Renderable renderable);
-  std::vector<Renderable> &renderables();
+  void addModel(Model model);
+  std::vector<Model> &models();
 
   VkPipelineLayout *pipelineLayout();
   VkPipeline *pipeline();
@@ -59,7 +57,7 @@ public:
 
 private:
   Camera m_camera;
-  std::vector<Renderable> m_renderables;
+  std::vector<Model> m_models;
 
   // Pipeline
   VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;

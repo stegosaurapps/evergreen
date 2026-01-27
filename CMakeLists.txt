@@ -34,7 +34,7 @@ target_compile_definitions(evergreen PRIVATE VK_USE_PLATFORM_WIN32_KHR)
 target_include_directories(evergreen PRIVATE
   ${CMAKE_SOURCE_DIR}/src
   ${CMAKE_SOURCE_DIR}/third_party
-  "${VULKAN_SDK}/Include"     # provides vulkan/ and SDL3/ headers (SDK)
+  "${VULKAN_SDK}/Include" # provides vulkan/ and SDL3/ headers (SDK)
 )
 
 # --- Shaders (GLSL -> SPIR-V using Vulkan SDK glslc) ---

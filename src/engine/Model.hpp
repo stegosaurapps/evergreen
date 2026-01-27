@@ -4,6 +4,14 @@
 
 #include <vector>
 
-struct Model {
+class Model {
+public:
+  Model() = default;
+  ~Model() = default;
+
+  void init(std::vector<Mesh> meshes);
+
+private:
   std::vector<Mesh> m_meshes;
+  // This is where the textures go
 };

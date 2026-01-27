@@ -43,6 +43,9 @@
 # build
 build/
 
+# dependencies
+third_party/
+
 # CMakeFiles
 CMakeFiles/
 CMakeCache.txt

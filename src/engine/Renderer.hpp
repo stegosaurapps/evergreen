@@ -42,7 +42,7 @@ private:
   int m_width = 0;
   int m_height = 0;
 
-  std::array<float, 3> m_clearColor = {0.0, 0.0, 0.0}; // {0.10, 0.16, 0.18};
+  std::array<float, 3> m_clearColor = {0.0, 0.0, 1.0}; // {0.10, 0.16, 0.18};
 
   VkInstance m_instance = VK_NULL_HANDLE;
 

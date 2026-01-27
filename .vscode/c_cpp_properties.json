@@ -4,7 +4,8 @@
       "name": "Win32",
       "includePath": [
         "${workspaceFolder}/**",
-        "C:/VulkanSDK/1.4.335.0/Include"
+        "C:/VulkanSDK/1.4.335.0/Include",
+        "${workspaceFolder}/third_party/"
       ],
       "defines": [],
       "windowsSdkVersion": "10.0.19041.0",

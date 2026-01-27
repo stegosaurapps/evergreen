@@ -6,12 +6,11 @@
 
 #include <iostream>
 
-void Scene::init(Renderer &renderer, Camera camera,
-                 std::vector<Renderable> renderables,
+void Scene::init(Renderer &renderer, Camera camera, std::vector<Model> models,
                  std::function<void(Renderer &, Scene *)> createPipeline,
                  std::function<void(Renderer &, Scene *)> destroyPipeline) {
   m_camera = camera;
-  m_renderables = renderables;
+  m_models = models;
   m_createPipeline = createPipeline;
   m_destroyPipeline = destroyPipeline;
 
@@ -42,17 +41,13 @@ void Scene::destroyPipeline(Renderer &renderer) {
 
 void Scene::resize(int width, int height) { m_camera.onResize(width, height); }
 
-Scene::~Scene() { shutdown(); }
-
 void Scene::attachCamera(Camera camera) { m_camera = camera; }
 
 Camera &Scene::camera() { return m_camera; }
 
-void Scene::addRenderable(Renderable renderable) {
-  m_renderables.push_back(std::move(renderable));
-}
+void Scene::addModel(Model model) { m_models.push_back(std::move(model)); }
 
-std::vector<Renderable> &Scene::renderables() { return m_renderables; }
+std::vector<Model> &Scene::models() { return m_models; }
 
 VkPipelineLayout *Scene::pipelineLayout() { return &m_pipelineLayout; }
 

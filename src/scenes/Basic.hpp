@@ -5,7 +5,7 @@
 #include "../engine/Camera.hpp"
 #include "../engine/Cube.hpp"
 #include "../engine/Dimensions.hpp"
-#include "../engine/Renderable.hpp"
+#include "../engine/Loader.hpp"
 #include "../engine/Renderer.hpp"
 #include "../engine/Scene.hpp"
 
@@ -532,12 +532,14 @@ Scene LoadScene(Renderer &renderer) {
   // Finally create renderable
   createMesh(renderer, &scene);
 
-  // TODO: Setup Renderables
-  std::vector<Renderable> renderables{};
+  // TODO: Setup Models
+  std::vector<Model> models{};
 
   auto camera = createCamera(renderer.dimensions());
 
-  scene.init(renderer, camera, renderables, createPipeline, destroyPipeline);
+  scene.init(renderer, camera, models, createPipeline, destroyPipeline);
+
+  // loadModel("./assets/model/chair/chair.glb");
 
   return scene;
 }

@@ -1,9 +1,13 @@
 #pragma once
 
+#include <stddef.h>
+
 struct Vertex {
-  float px, py, pz;
-  float nx, ny, nz;
-  float ux, uy;
+  float px, py, pz;     // Position
+  float nx, ny, nz;     // Normal
+  float tx, ty, tz, tw; // Tangent
+  float ux, uy;         // Texture Coordinate
+  float r, g, b;        // Color
 };
 
 struct VertexColor {
