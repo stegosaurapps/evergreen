@@ -8,10 +8,8 @@
 
 #include "../Vulkan.hpp"
 
-#include "Cube.hpp"
 #include "Renderer.hpp"
 #include "Scene.hpp"
-#include "Vertex.hpp"
 
 #include <SDL3/SDL.h>
 
@@ -938,14 +936,21 @@ void Renderer::recordCommandBuffer(VkCommandBuffer commandBuffer,
 
   VkDeviceSize off = 0;
 
-  vkCmdBindVertexBuffers(commandBuffer, 0, 1, scene->vertexBuffer(), &off);
-  vkCmdBindIndexBuffer(commandBuffer, *scene->indexBuffer(), 0,
-                       VK_INDEX_TYPE_UINT32);
+  // model/mesh rendering.
+  for (Model &model : scene->models()) {
+    for (Mesh &mesh : model.meshes()) {
+      VkBuffer vertexBuffer = mesh.vertexBuffer();
+      VkBuffer indexBuffer = mesh.indexBuffer();
+      uint32_t indexCount = mesh.indexCount();
 
-  vkCmdDrawIndexed(commandBuffer, *scene->indexCount(), 1, 0, 0, 0);
+      vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer, &off);
+      vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+      vkCmdDrawIndexed(commandBuffer, indexCount, 1, 0, 0, 0);
+    }
+  }
 
   vkCmdEndRenderPass(commandBuffer);
-
   vkEndCommandBuffer(commandBuffer);
 }
 

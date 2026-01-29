@@ -12,6 +12,10 @@
 #include <memory>
 #include <vector>
 
+VertexCollector basicVertexCollector() {
+  return VertexCollector({Position, Normal, Color});
+}
+
 Camera createCamera(Dimensions dimensions) {
   Camera camera;
   camera.setOrbitTarget({0.0f, 0.0f, 0.0f});
@@ -97,6 +101,8 @@ void createPipeline(Renderer &renderer, Scene *scene) {
   auto pipeline = scene->pipeline();
 
   auto descriptorSetLayout = scene->descriptorSetLayout();
+
+  auto vertexCollector = basicVertexCollector();
 
   if (*pipeline) {
     vkDestroyPipeline(device, *pipeline, nullptr);
@@ -366,175 +372,30 @@ void createUniformBuffers(Renderer &renderer, Scene *scene) {
   }
 }
 
-// void Renderer::createMeshBuffers() {
-//   // Build a single triangle in the scene. You'll replace this with a real
-//   model
-//   // loader.
-//   // m_scene = Scene{};
-//   Scene m_scene;
-//   Renderable r{};
-//   r.mesh.vertices = {
-//       {0.0f, -0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 0.5f, 1.0f},
-//       {0.5f, 0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f},
-//       {-0.5f, 0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f},
-//   };
-//   r.mesh.indices = {0, 1, 2};
-//   m_scene.addRenderable(std::move(r));
+std::vector<Model> createModels(Renderer &renderer) {
+  auto vertexCollector = basicVertexCollector();
+  GenerateCube(&vertexCollector);
 
-//   const Mesh &m = m_scene.renderables()[0].mesh;
-//   m_indexCount = (uint32_t)m.indices.size();
+  auto model = vertexCollector.buildModel(renderer);
 
-//   // Recreate buffers if they exist.
-//   if (m_vertexBuffer) {
-//     vkDestroyBuffer(m_device, m_vertexBuffer, nullptr);
-//     vkFreeMemory(m_device, m_vertexMemory, nullptr);
-//     m_vertexBuffer = VK_NULL_HANDLE;
-//     m_vertexMemory = VK_NULL_HANDLE;
-//   }
-//   if (m_indexBuffer) {
-//     vkDestroyBuffer(m_device, m_indexBuffer, nullptr);
-//     vkFreeMemory(m_device, m_indexMemory, nullptr);
-//     m_indexBuffer = VK_NULL_HANDLE;
-//     m_indexMemory = VK_NULL_HANDLE;
-//   }
-
-//   VkDeviceSize vsize = sizeof(Vertex) * m.vertices.size();
-//   VkDeviceSize isize = sizeof(uint32_t) * m.indices.size();
-
-//   if (!CreateBuffer(m_physicalDevice, m_device, vsize,
-//                     VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-//                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-//                         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-//                     m_vertexBuffer, m_vertexMemory)) {
-//     std::abort();
-//   }
-//   if (!CreateBuffer(m_physicalDevice, m_device, isize,
-//                     VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-//                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-//                         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-//                     m_indexBuffer, m_indexMemory)) {
-//     std::abort();
-//   }
-
-//   void *mapped = nullptr;
-//   vkMapMemory(m_device, m_vertexMemory, 0, vsize, 0, &mapped);
-//   std::memcpy(mapped, m.vertices.data(), (size_t)vsize);
-//   vkUnmapMemory(m_device, m_vertexMemory);
-
-//   vkMapMemory(m_device, m_indexMemory, 0, isize, 0, &mapped);
-//   std::memcpy(mapped, m.indices.data(), (size_t)isize);
-//   vkUnmapMemory(m_device, m_indexMemory);
-// }
-
-// Mesh createMesh(Renderer &renderer, Scene *scene) {
-//   auto physicalDevice = renderer.physicalDevice();
-//   auto device = renderer.device();
-
-//   Mesh mesh = Mesh{};
-
-//   // std::vector<VertexColor> verts;
-//   // std::vector<uint32_t> idx;
-
-//   BuildCube(mesh.vertices, mesh.indices);
-
-//   *scene->indexCount() = (uint32_t)mesh.indices.size();
-
-//   const VkDeviceSize vertexBufferSize = sizeof(VertexColor) *
-//   mesh.vertices.size(); const VkDeviceSize indexBufferSize = sizeof(uint32_t)
-//   * mesh.indices.size();
-
-//   if (!CreateBuffer(physicalDevice, device, vertexBufferSize,
-//                     VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-//                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-//                         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-//                     *scene->vertexBuffer(), *scene->vertexMemory())) {
-//     std::cerr << "Failed to create cube vertex buffer" << std::endl;
-//     std::abort();
-//   }
-
-//   if (!CreateBuffer(physicalDevice, device, indexBufferSize,
-//                     VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-//                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-//                         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-//                     *scene->indexBuffer(), *scene->indexMemory())) {
-//     std::cerr << "Failed to create cube index buffer" << std::endl;
-//     std::abort();
-//   }
-
-//   void *data = nullptr;
-//   vkMapMemory(device, *scene->vertexMemory(), 0, vertexBufferSize, 0, &data);
-//   std::memcpy(data, verts.data(), (size_t)vertexBufferSize);
-//   vkUnmapMemory(device, *scene->vertexMemory());
-
-//   vkMapMemory(device, *scene->indexMemory(), 0, indexBufferSize, 0, &data);
-//   std::memcpy(data, idx.data(), (size_t)indexBufferSize);
-//   vkUnmapMemory(device, *scene->indexMemory());
-
-//   std::cout << "Cube verts=" << verts.size() << " idx=" << idx.size()
-//             << std::endl;
-// }
-
-void createMesh(Renderer &renderer, Scene *scene) {
-  auto physicalDevice = renderer.physicalDevice();
-  auto device = renderer.device();
-
-  std::vector<VertexColor> verts;
-  std::vector<uint32_t> idx;
-
-  BuildCube(verts, idx);
-
-  *scene->indexCount() = (uint32_t)idx.size();
-
-  const VkDeviceSize vertexBufferSize = sizeof(VertexColor) * verts.size();
-  const VkDeviceSize indexBufferSize = sizeof(uint32_t) * idx.size();
-
-  if (!CreateBuffer(physicalDevice, device, vertexBufferSize,
-                    VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                    *scene->vertexBuffer(), *scene->vertexMemory())) {
-    std::cerr << "Failed to create cube vertex buffer" << std::endl;
-    std::abort();
-  }
-
-  if (!CreateBuffer(physicalDevice, device, indexBufferSize,
-                    VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                    *scene->indexBuffer(), *scene->indexMemory())) {
-    std::cerr << "Failed to create cube index buffer" << std::endl;
-    std::abort();
-  }
-
-  void *data = nullptr;
-  vkMapMemory(device, *scene->vertexMemory(), 0, vertexBufferSize, 0, &data);
-  std::memcpy(data, verts.data(), (size_t)vertexBufferSize);
-  vkUnmapMemory(device, *scene->vertexMemory());
-
-  vkMapMemory(device, *scene->indexMemory(), 0, indexBufferSize, 0, &data);
-  std::memcpy(data, idx.data(), (size_t)indexBufferSize);
-  vkUnmapMemory(device, *scene->indexMemory());
-
-  std::cout << "Cube verts=" << verts.size() << " idx=" << idx.size()
-            << std::endl;
+  std::vector<Model> models = {model};
+  return models;
 }
 
 Scene LoadScene(Renderer &renderer) {
   Scene scene;
 
-  // First create descriptors
+  // First create descriptors.
   createDescriptorSetLayout(renderer, &scene);
   createDescriptorPool(renderer, &scene);
 
-  // Next create uniform buffers
+  // Next create uniform buffers.
   createUniformBuffers(renderer, &scene);
 
-  // Finally create renderable
-  createMesh(renderer, &scene);
+  // Next create model.
+  auto models = createModels(renderer);
 
-  // TODO: Setup Models
-  std::vector<Model> models{};
-
+  // Finally create Camera.
   auto camera = createCamera(renderer.dimensions());
 
   scene.init(renderer, camera, models, createPipeline, destroyPipeline);

@@ -47,12 +47,6 @@ public:
   std::array<VkDeviceMemory, FRAME_COUNT> *uboMemoryList();
   std::array<void *, FRAME_COUNT> *uboMappedList();
 
-  uint32_t *indexCount();
-  VkBuffer *vertexBuffer();
-  VkDeviceMemory *vertexMemory();
-  VkBuffer *indexBuffer();
-  VkDeviceMemory *indexMemory();
-
   void shutdown();
 
 private:
@@ -73,15 +67,6 @@ private:
   std::array<VkDeviceMemory, FRAME_COUNT> m_uboMemoryList{};
   std::array<void *, FRAME_COUNT> m_uboMappedList{};
 
-  // One demo mesh on GPU (first scene renderable)
-  uint32_t m_indexCount = 0;
-  VkBuffer m_vertexBuffer = VK_NULL_HANDLE;
-  VkDeviceMemory m_vertexMemory = VK_NULL_HANDLE;
-  VkBuffer m_indexBuffer = VK_NULL_HANDLE;
-  VkDeviceMemory m_indexMemory = VK_NULL_HANDLE;
-
   std::function<void(Renderer &, Scene *)> m_createPipeline;
   std::function<void(Renderer &, Scene *)> m_destroyPipeline;
-
-  void destroyResources(Renderer &renderer);
 };

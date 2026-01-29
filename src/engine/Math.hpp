@@ -2,9 +2,6 @@
 
 #include <cmath>
 
-// Minimal math for the Vulkan demo (no external deps).
-// Mat4 is column-major: m[col*4 + row].
-
 struct Vec3 {
   float x = 0.0f, y = 0.0f, z = 0.0f;
 };
@@ -33,6 +30,7 @@ inline Vec3 normalize(Vec3 v) {
   return mul(v, 1.0f / len);
 }
 
+// Mat4 is column-major: m[col*4 + row].
 struct Mat4 {
   float m[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
 

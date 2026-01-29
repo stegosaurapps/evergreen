@@ -1,8 +1,7 @@
-#include "Scene.hpp"
-
 #include "../Vulkan.hpp"
 
 #include "Renderer.hpp"
+#include "Scene.hpp"
 
 #include <iostream>
 
@@ -75,149 +74,7 @@ std::array<void *, FRAME_COUNT> *Scene::uboMappedList() {
   return &m_uboMappedList;
 }
 
-uint32_t *Scene::indexCount() { return &m_indexCount; }
-
-VkBuffer *Scene::vertexBuffer() { return &m_vertexBuffer; }
-
-VkDeviceMemory *Scene::vertexMemory() { return &m_vertexMemory; }
-
-VkBuffer *Scene::indexBuffer() { return &m_indexBuffer; }
-
-VkDeviceMemory *Scene::indexMemory() { return &m_indexMemory; }
-
-void Scene::destroyResources(Renderer &renderer) {
-  auto device = renderer.device();
-
-  if (!device) {
-    return;
-  }
-
-  // Mesh buffers
-  if (m_vertexBuffer) {
-    vkDestroyBuffer(device, m_vertexBuffer, nullptr);
-    m_vertexBuffer = VK_NULL_HANDLE;
-  }
-  if (m_vertexMemory) {
-    vkFreeMemory(device, m_vertexMemory, nullptr);
-    m_vertexMemory = VK_NULL_HANDLE;
-  }
-
-  if (m_indexBuffer) {
-    vkDestroyBuffer(device, m_indexBuffer, nullptr);
-    m_indexBuffer = VK_NULL_HANDLE;
-  }
-  if (m_indexMemory) {
-    vkFreeMemory(device, m_indexMemory, nullptr);
-    m_indexMemory = VK_NULL_HANDLE;
-  }
-
-  // Uniform buffers (per-frame)
-  for (int i = 0; i < FRAME_COUNT; ++i) {
-    if (m_uboMappedList[i]) {
-      vkUnmapMemory(device, m_uboMemoryList[i]);
-      m_uboMappedList[i] = nullptr;
-    }
-
-    if (m_uboBufferList[i]) {
-      vkDestroyBuffer(device, m_uboBufferList[i], nullptr);
-      m_uboBufferList[i] = VK_NULL_HANDLE;
-    }
-
-    if (m_uboMemoryList[i]) {
-      vkFreeMemory(device, m_uboMemoryList[i], nullptr);
-      m_uboMemoryList[i] = VK_NULL_HANDLE;
-    }
-  }
-
-  // Descriptor pool
-  if (m_descriptorPool) {
-    vkDestroyDescriptorPool(device, m_descriptorPool, nullptr);
-    m_descriptorPool = VK_NULL_HANDLE;
-  }
-
-  // Descriptor set layout
-  if (m_descriptorSetLayout) {
-    vkDestroyDescriptorSetLayout(device, m_descriptorSetLayout, nullptr);
-    m_descriptorSetLayout = VK_NULL_HANDLE;
-  }
-}
-
 void Scene::shutdown() {
   // m_destroyPipeline();
   // destroyResources();
 }
-
-// void Renderer::destroyDeviceResources() {
-//   if (!m_device) {
-//     return;
-//   }
-
-//   // Mesh buffers
-//   if (m_vertexBuffer) {
-//     vkDestroyBuffer(m_device, m_vertexBuffer, nullptr);
-//     m_vertexBuffer = VK_NULL_HANDLE;
-//   }
-//   if (m_vertexMemory) {
-//     vkFreeMemory(m_device, m_vertexMemory, nullptr);
-//     m_vertexMemory = VK_NULL_HANDLE;
-//   }
-
-//   if (m_indexBuffer) {
-//     vkDestroyBuffer(m_device, m_indexBuffer, nullptr);
-//     m_indexBuffer = VK_NULL_HANDLE;
-//   }
-//   if (m_indexMemory) {
-//     vkFreeMemory(m_device, m_indexMemory, nullptr);
-//     m_indexMemory = VK_NULL_HANDLE;
-//   }
-
-//   // Uniform buffers (per-frame)
-//   for (int i = 0; i < FRAME_COUNT; ++i) {
-//     if (m_uboMapped[i]) {
-//       vkUnmapMemory(m_device, m_uboMemory[i]);
-//       m_uboMapped[i] = nullptr;
-//     }
-
-//     if (m_uboBuffer[i]) {
-//       vkDestroyBuffer(m_device, m_uboBuffer[i], nullptr);
-//       m_uboBuffer[i] = VK_NULL_HANDLE;
-//     }
-
-//     if (m_uboMemory[i]) {
-//       vkFreeMemory(m_device, m_uboMemory[i], nullptr);
-//       m_uboMemory[i] = VK_NULL_HANDLE;
-//     }
-//   }
-
-//   // Cube resources
-//   // TODO: Move to scene
-//   if (m_cubeVB) {
-//     vkDestroyBuffer(m_device, m_cubeVB, nullptr);
-//     m_cubeVB = VK_NULL_HANDLE;
-//   }
-//   if (m_cubeVBMem) {
-//     vkFreeMemory(m_device, m_cubeVBMem, nullptr);
-//     m_cubeVBMem = VK_NULL_HANDLE;
-//   }
-//   if (m_cubeIB) {
-//     vkDestroyBuffer(m_device, m_cubeIB, nullptr);
-//     m_cubeIB = VK_NULL_HANDLE;
-//   }
-//   if (m_cubeIBMem) {
-//     vkFreeMemory(m_device, m_cubeIBMem, nullptr);
-//     m_cubeIBMem = VK_NULL_HANDLE;
-//   }
-//   m_cubeIndexCount = 0;
-
-//   // Descriptor pool
-//   if (m_descPool) {
-//     vkDestroyDescriptorPool(m_device, m_descPool, nullptr);
-//     m_descPool = VK_NULL_HANDLE;
-//   }
-
-//   // Descriptor set layout
-//   if (m_setLayoutFrame) {
-//     vkDestroyDescriptorSetLayout(m_device, m_setLayoutFrame, nullptr);
-//     m_setLayoutFrame = VK_NULL_HANDLE;
-//   }
-// }
