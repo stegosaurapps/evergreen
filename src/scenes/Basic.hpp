@@ -154,37 +154,43 @@ void createPipeline(Renderer &renderer, Scene *scene) {
   // Vertex input
   VkVertexInputBindingDescription vertexInputBindingDescription{};
   vertexInputBindingDescription.binding = 0;
-  vertexInputBindingDescription.stride = sizeof(VertexColor);
+  vertexInputBindingDescription.stride = vertexCollector.vertexStride();
   vertexInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-  VkVertexInputAttributeDescription vertexInputAttributeDescription[3]{};
+  auto vertexAttributes = vertexCollector.vertexAttributes();
 
-  // position
-  vertexInputAttributeDescription[0].location = 0;
-  vertexInputAttributeDescription[0].binding = 0;
-  vertexInputAttributeDescription[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-  vertexInputAttributeDescription[0].offset = offsetof(VertexColor, px);
+  std::vector<VkVertexInputAttributeDescription>
+      vertexInputAttributeDescriptions;
 
-  // normal
-  vertexInputAttributeDescription[1].location = 1;
-  vertexInputAttributeDescription[1].binding = 0;
-  vertexInputAttributeDescription[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-  vertexInputAttributeDescription[1].offset = offsetof(VertexColor, nx);
+  uint32_t offset = 0;
+  for (int i = 0; i < vertexAttributes.size(); i++) {
+    auto vertexAttribute = vertexAttributes[i];
 
-  // color
-  vertexInputAttributeDescription[2].location = 2;
-  vertexInputAttributeDescription[2].binding = 0;
-  vertexInputAttributeDescription[2].format = VK_FORMAT_R32G32B32_SFLOAT;
-  vertexInputAttributeDescription[2].offset = offsetof(VertexColor, r);
+    uint32_t attributeSize = sizeof(float) * AttributeCount(vertexAttribute);
+
+    VkVertexInputAttributeDescription vertexInputAttributeDescription;
+    vertexInputAttributeDescription.location = i;
+    vertexInputAttributeDescription.binding = 0;
+    vertexInputAttributeDescription.format = VulkanFormat(vertexAttribute);
+    vertexInputAttributeDescription.offset = offset;
+
+    vertexInputAttributeDescriptions.push_back(vertexInputAttributeDescription);
+
+    offset += attributeSize;
+  }
 
   VkPipelineVertexInputStateCreateInfo pipelineVertexInputStateCreateInfo{
       VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
   pipelineVertexInputStateCreateInfo.vertexBindingDescriptionCount = 1;
   pipelineVertexInputStateCreateInfo.pVertexBindingDescriptions =
       &vertexInputBindingDescription;
-  pipelineVertexInputStateCreateInfo.vertexAttributeDescriptionCount = 3;
+  pipelineVertexInputStateCreateInfo.vertexAttributeDescriptionCount =
+      vertexInputAttributeDescriptions.size();
   pipelineVertexInputStateCreateInfo.pVertexAttributeDescriptions =
-      vertexInputAttributeDescription;
+      vertexInputAttributeDescriptions.data();
+
+  // VkPipelineVertexInputStateCreateInfo pipelineVertexInputStateCreateInfo =
+  //     vertexCollector.pipelineVertexInputStateCreateInfo();
 
   VkPipelineInputAssemblyStateCreateInfo pipelineInputAsseblyStateCreateInfo{
       VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};

@@ -32,6 +32,21 @@ inline int AttributeCount(VertexAttribute vertexAttribute) {
   }
 }
 
+inline VkFormat VulkanFormat(VertexAttribute vertexAttribute) {
+  switch (vertexAttribute) {
+  case VertexAttribute::Position:
+    return VK_FORMAT_R32G32B32_SFLOAT;
+  case VertexAttribute::Normal:
+    return VK_FORMAT_R32G32B32_SFLOAT;
+  case VertexAttribute::Tangent:
+    return VK_FORMAT_R32G32B32A32_SFLOAT;
+  case VertexAttribute::TextureCoordinate:
+    return VK_FORMAT_R32G32_SFLOAT;
+  case VertexAttribute::Color:
+    return VK_FORMAT_R32G32B32_SFLOAT;
+  }
+}
+
 struct Vertex {
   float px, py, pz;     // Position
   float nx, ny, nz;     // Normal
@@ -64,6 +79,8 @@ public:
   VkPipelineVertexInputStateCreateInfo pipelineVertexInputStateCreateInfo();
 
   unsigned long long vertexStride();
+
+  std::vector<VertexAttribute> vertexAttributes();
 
   void insertVertex(Vertex vertex);
   void addVertices(std::vector<Vertex> vertices);

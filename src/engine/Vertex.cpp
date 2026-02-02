@@ -16,36 +16,35 @@ VertexCollector::pipelineVertexInputStateCreateInfo() {
   vertexInputBindingDescription.stride = vertexStride();
   vertexInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-  int attributeCount = m_vertexAttributes.size();
+  std::vector<VkVertexInputAttributeDescription>
+      vertexInputAttributeDescriptions;
 
-  VkVertexInputAttributeDescription vertexInputAttributeDescription[3]{};
+  uint32_t offset = 0;
+  for (int i = 0; i < m_vertexAttributes.size(); i++) {
+    auto vertexAttribute = m_vertexAttributes[i];
 
-  // position
-  vertexInputAttributeDescription[0].location = 0;
-  vertexInputAttributeDescription[0].binding = 0;
-  vertexInputAttributeDescription[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-  vertexInputAttributeDescription[0].offset = offsetof(VertexColor, px);
+    uint32_t attributeSize = sizeof(float) * AttributeCount(vertexAttribute);
 
-  // normal
-  vertexInputAttributeDescription[1].location = 1;
-  vertexInputAttributeDescription[1].binding = 0;
-  vertexInputAttributeDescription[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-  vertexInputAttributeDescription[1].offset = offsetof(VertexColor, nx);
+    VkVertexInputAttributeDescription vertexInputAttributeDescription;
+    vertexInputAttributeDescription.location = i;
+    vertexInputAttributeDescription.binding = 0;
+    vertexInputAttributeDescription.format = VulkanFormat(vertexAttribute);
+    vertexInputAttributeDescription.offset = offset;
 
-  // color
-  vertexInputAttributeDescription[2].location = 2;
-  vertexInputAttributeDescription[2].binding = 0;
-  vertexInputAttributeDescription[2].format = VK_FORMAT_R32G32B32_SFLOAT;
-  vertexInputAttributeDescription[2].offset = offsetof(VertexColor, r);
+    vertexInputAttributeDescriptions.push_back(vertexInputAttributeDescription);
+
+    offset += attributeSize;
+  }
 
   VkPipelineVertexInputStateCreateInfo pipelineVertexInputStateCreateInfo{
       VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
   pipelineVertexInputStateCreateInfo.vertexBindingDescriptionCount = 1;
   pipelineVertexInputStateCreateInfo.pVertexBindingDescriptions =
       &vertexInputBindingDescription;
-  pipelineVertexInputStateCreateInfo.vertexAttributeDescriptionCount = 3;
+  pipelineVertexInputStateCreateInfo.vertexAttributeDescriptionCount =
+      vertexInputAttributeDescriptions.size();
   pipelineVertexInputStateCreateInfo.pVertexAttributeDescriptions =
-      vertexInputAttributeDescription;
+      vertexInputAttributeDescriptions.data();
 
   return pipelineVertexInputStateCreateInfo;
 }
@@ -63,6 +62,10 @@ unsigned long long VertexCollector::vertexStride() {
   }
 
   return sizeAccumulator;
+}
+
+std::vector<VertexAttribute> VertexCollector::vertexAttributes() {
+  return m_vertexAttributes;
 }
 
 void VertexCollector::insertVertex(Vertex vertex) {
