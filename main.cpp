@@ -1,6 +1,6 @@
 #include "src/engine/Engine.hpp"
-#include "src/scenes/Basic.hpp"
-// #include "src/scenes/Chair.hpp"
+// #include "src/scenes/Basic.hpp"
+#include "src/scenes/Chair.hpp"
 
 #include <iostream>
 
@@ -13,8 +13,6 @@ int main(int, char**) {
     engine.loadScene(LoadScene(engine.renderer()));
 
     engine.run();
-
-    // LoadScene(engine.renderer());
 
     return 0;
 }

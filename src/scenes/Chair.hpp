@@ -2,6 +2,7 @@
 
 #include "../Vulkan.hpp"
 
+#include "../engine/Builder.hpp"
 #include "../engine/Camera.hpp"
 #include "../engine/Cube.hpp"
 #include "../engine/Dimensions.hpp"
@@ -18,10 +19,6 @@ VertexDescriptor basicVertexDescriptor() {
   vertexDescriptor.init({Position, Normal, Color});
 
   return vertexDescriptor;
-}
-
-VertexCollector basicVertexCollector() {
-  return VertexCollector(basicVertexDescriptor());
 }
 
 Camera createCamera(Dimensions dimensions) {
@@ -110,7 +107,7 @@ void createPipeline(Renderer &renderer, Scene *scene) {
 
   auto descriptorSetLayout = scene->descriptorSetLayout();
 
-  auto vertexCollector = basicVertexCollector();
+  auto vertexDescriptor = basicVertexDescriptor();
 
   if (*pipeline) {
     vkDestroyPipeline(device, *pipeline, nullptr);
@@ -162,10 +159,10 @@ void createPipeline(Renderer &renderer, Scene *scene) {
   // Vertex input
   VkVertexInputBindingDescription vertexInputBindingDescription{};
   vertexInputBindingDescription.binding = 0;
-  vertexInputBindingDescription.stride = vertexCollector.vertexStride();
+  vertexInputBindingDescription.stride = vertexDescriptor.vertexStride();
   vertexInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-  auto vertexAttributes = vertexCollector.vertexAttributes();
+  auto vertexAttributes = vertexDescriptor.vertexAttributes();
 
   std::vector<VkVertexInputAttributeDescription>
       vertexInputAttributeDescriptions;
@@ -385,14 +382,21 @@ void createUniformBuffers(Renderer &renderer, Scene *scene) {
 }
 
 std::vector<Model> createModels(Renderer &renderer) {
-  auto vertexCollector = basicVertexCollector();
+  // Builder builder = Builder(basicVertexDescriptor());
 
-  // GenerateCube(&vertexCollector);
-  loadModel("./assets/model/chair/chair.glb", &vertexCollector);
+  // // GenerateCube(&vertexCollector);
+  // loadModel("./assets/model/chair/chair.glb", &builder);
 
-  auto model = vertexCollector.buildModel(renderer);
+  // auto model = builder.buildModel(renderer);
+
+  // std::vector<Model> models = {model};
+
+  // return models;
+
+  Model model = GenerateCube(renderer, basicVertexDescriptor());
 
   std::vector<Model> models = {model};
+
   return models;
 }
 
@@ -413,6 +417,8 @@ Scene LoadScene(Renderer &renderer) {
   auto models = createModels(renderer);
 
   scene.init(renderer, camera, models, createPipeline, destroyPipeline);
+
+  // loadModel("./assets/model/chair/chair.glb");
 
   return scene;
 }

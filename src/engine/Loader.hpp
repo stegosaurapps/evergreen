@@ -4,13 +4,14 @@
 #define CGLTF_IMPLEMENTATION
 #endif
 
+#include "Builder.hpp"
 #include "Vertex.hpp"
 
 #include <cgltf/cgltf.h>
 
 #include <iostream>
 
-Model loadModel(const char *filePath, VertexCollector *vertexCollector) {
+Model loadModel(const char *filePath, Builder *builder) {
   cgltf_options options{};
   cgltf_data *data = nullptr;
 
