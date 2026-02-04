@@ -382,22 +382,18 @@ void createUniformBuffers(Renderer &renderer, Scene *scene) {
 }
 
 std::vector<Model> createModels(Renderer &renderer) {
-  // Builder builder = Builder(basicVertexDescriptor());
-
-  // // GenerateCube(&vertexCollector);
-  // loadModel("./assets/model/chair/chair.glb", &builder);
-
-  // auto model = builder.buildModel(renderer);
-
-  // std::vector<Model> models = {model};
-
-  // return models;
-
-  Model model = GenerateCube(renderer, basicVertexDescriptor());
+  auto model = loadModel(renderer, "./assets/model/chair/chair.glb",
+                         basicVertexDescriptor());
 
   std::vector<Model> models = {model};
 
   return models;
+
+  // Model model = GenerateCube(renderer, basicVertexDescriptor());
+
+  // std::vector<Model> models = {model};
+
+  // return models;
 }
 
 Scene LoadScene(Renderer &renderer) {

@@ -71,6 +71,20 @@ struct Vertex {
   float r, g, b;        // Color
 };
 
+inline void PrintVertex(Vertex *vertex) {
+  std::cout << "------ VERTEX ------" << std::endl;
+  std::cout << "  Position: (" << vertex->px << ", " << vertex->py << ", "
+            << vertex->pz << ")" << std::endl;
+  std::cout << "  Normal: (" << vertex->nx << ", " << vertex->ny << ", "
+            << vertex->nz << ")" << std::endl;
+  // std::cout << "  Tangent: (" << vertex->px << ", " << vertex->py << ", " <<
+  // vertex->pz << ")" << std::endl; std::cout << "  Texture Coordinate: (" <<
+  // vertex->px << ", " << vertex->py << ", " << vertex->pz << ")" << std::endl;
+  std::cout << "  Color: (" << vertex->r << ", " << vertex->g << ", "
+            << vertex->b << ")" << std::endl;
+  std::cout << "--------------------" << std::endl;
+}
+
 inline std::vector<float> VertexAttributeData(Vertex vertex,
                                               VertexAttribute vertexAttribute) {
   switch (vertexAttribute) {
