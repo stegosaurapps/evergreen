@@ -4,11 +4,13 @@
 #define CGLTF_IMPLEMENTATION
 #endif
 
+#include "Vertex.hpp"
+
 #include <cgltf/cgltf.h>
 
 #include <iostream>
 
-void loadModel(const char *filePath) {
+Model loadModel(const char *filePath, VertexCollector *vertexCollector) {
   cgltf_options options{};
   cgltf_data *data = nullptr;
 
@@ -35,7 +37,7 @@ void loadModel(const char *filePath) {
     std::abort();
   }
 
-  std::cout << "Meshes: " << data->meshes_count << "\n";
+  std::cout << "Meshes: " << data->meshes_count << std::endl;
 
   std::cout << "I loaded the chair!!!" << std::endl;
 }

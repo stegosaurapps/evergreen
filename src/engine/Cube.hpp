@@ -1,10 +1,57 @@
 #pragma once
 
-#include "vertex.hpp"
+#include "Builder.hpp"
+#include "Vertex.hpp"
+
 #include <cstdint>
 #include <vector>
 
-void GenerateCube(VertexCollector *vertexCollector) {
+// void GenerateCube(VertexCollector *vertexCollector) {
+//   std::vector<Vertex> vertices = {
+//       // +X
+//       {+1, -1, -1, +1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0},
+//       {+1, +1, -1, +1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0},
+//       {+1, +1, +1, +1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1},
+//       {+1, -1, +1, +1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1},
+//       // -X
+//       {-1, -1, +1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+//       {-1, +1, +1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1},
+//       {-1, +1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0},
+//       {-1, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//       // +Y
+//       {-1, +1, -1, 0, +1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0},
+//       {-1, +1, +1, 0, +1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1},
+//       {+1, +1, +1, 0, +1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1},
+//       {+1, +1, -1, 0, +1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0},
+//       // -Y
+//       {-1, -1, +1, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+//       {-1, -1, -1, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//       {+1, -1, -1, 0, -1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0},
+//       {+1, -1, +1, 0, -1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1},
+//       // +Z
+//       {+1, -1, +1, 0, 0, +1, 0, 0, 0, 0, 0, 0, 1, 0, 1},
+//       {+1, +1, +1, 0, 0, +1, 0, 0, 0, 0, 0, 0, 1, 1, 1},
+//       {-1, +1, +1, 0, 0, +1, 0, 0, 0, 0, 0, 0, 0, 1, 1},
+//       {-1, -1, +1, 0, 0, +1, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+//       // -Z
+//       {-1, -1, -1, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//       {-1, +1, -1, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 1, 0},
+//       {+1, +1, -1, 0, 0, -1, 0, 0, 0, 0, 0, 0, 1, 1, 0},
+//       {+1, -1, -1, 0, 0, -1, 0, 0, 0, 0, 0, 0, 1, 0, 0},
+//   };
+
+//   std::vector<uint32_t> indices = {
+//       0,  1,  2,  0,  2,  3,  4,  5,  6,  4,  6,  7,  8,  9,  10, 8,  10, 11,
+//       12, 13, 14, 12, 14, 15, 16, 17, 18, 16, 18, 19, 20, 21, 22, 20, 22,
+//       23};
+
+//   vertexCollector->addVertices(vertices);
+//   vertexCollector->addIndices(indices);
+// }
+
+Model GenerateCube(Renderer &renderer, VertexDescriptor vertexDescriptor) {
+  Builder builder = Builder(vertexDescriptor);
+
   std::vector<Vertex> vertices = {
       // +X
       {+1, -1, -1, +1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0},
@@ -42,6 +89,10 @@ void GenerateCube(VertexCollector *vertexCollector) {
       0,  1,  2,  0,  2,  3,  4,  5,  6,  4,  6,  7,  8,  9,  10, 8,  10, 11,
       12, 13, 14, 12, 14, 15, 16, 17, 18, 16, 18, 19, 20, 21, 22, 20, 22, 23};
 
-  vertexCollector->addVertices(vertices);
-  vertexCollector->addIndices(indices);
+  builder.addVertices(vertices);
+  builder.addIndices(indices);
+
+  builder.generateMesh(renderer);
+
+  return builder.buildModel(renderer);
 }

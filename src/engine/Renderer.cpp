@@ -46,7 +46,7 @@ bool Renderer::init(const Win32WindowHandles &windowHandler, int width,
   createCommandBuffers();
   createSyncObjects();
 
-  std::cout << "Renderer init OK.\n";
+  std::cout << "Renderer init OK." << std::endl;
 
   return true;
 }
@@ -204,7 +204,7 @@ void Renderer::shutdown() {
   m_graphicsFamily = UINT32_MAX;
   m_presentFamily = UINT32_MAX;
 
-  std::cout << "Renderer shutdown OK.\n";
+  std::cout << "Renderer shutdown OK." << std::endl;
 }
 
 void Renderer::createInstance() {
@@ -264,7 +264,7 @@ void Renderer::setupDebug() {
       m_instance, "vkCreateDebugUtilsMessengerEXT");
 
   if (!pfnCreate) {
-    std::cerr << "vkCreateDebugUtilsMessengerEXT not found.\n";
+    std::cerr << "vkCreateDebugUtilsMessengerEXT not found." << std::endl;
     std::abort();
   }
 
@@ -291,7 +291,7 @@ void Renderer::setupDebug() {
 
 void Renderer::createSurface(const Win32WindowHandles &windowHandles) {
   if (!windowHandles.hwnd || !windowHandles.hinstance) {
-    std::cerr << "createSurface: invalid window handles.\n";
+    std::cerr << "createSurface: invalid window handles." << std::endl;
     std::abort();
   }
 
@@ -312,7 +312,7 @@ void Renderer::createPhysicalDevice() {
   uint32_t count = 0;
   vkEnumeratePhysicalDevices(m_instance, &count, nullptr);
   if (!count) {
-    std::cerr << "No Vulkan physical devices found.\n";
+    std::cerr << "No Vulkan physical devices found." << std::endl;
     std::abort();
   }
 
@@ -327,7 +327,7 @@ void Renderer::createPhysicalDevice() {
     // Must support swapchain extension.
     if (!CheckDeviceExtensionSupport(physicalDevice,
                                      requiredDeviceExtensions)) {
-      std::cerr << "Swapchain extension is not supported.\n";
+      std::cerr << "Swapchain extension is not supported." << std::endl;
       std::abort();
     }
 
@@ -366,7 +366,7 @@ void Renderer::createPhysicalDevice() {
     }
 
     if (!queueFlags || !present) {
-      std::cerr << "Physical device could not be configured.\n";
+      std::cerr << "Physical device could not be configured." << std::endl;
       std::abort();
     }
 
@@ -374,7 +374,8 @@ void Renderer::createPhysicalDevice() {
     auto sup = QuerySwapchainSupport(physicalDevice, m_surface);
     if (sup.formats.empty() || sup.presentModes.empty()) {
       std::cerr << "Swapchain must have at least one supported format and "
-                   "present mode.\n";
+                   "present mode."
+                << std::endl;
       std::abort();
     }
 
@@ -422,7 +423,7 @@ void Renderer::createPhysicalDevice() {
   }
 
   if (!bestPhysicalDevice) {
-    std::cerr << "No suitable GPU found.\n";
+    std::cerr << "No suitable GPU found." << std::endl;
     std::abort();
   }
 

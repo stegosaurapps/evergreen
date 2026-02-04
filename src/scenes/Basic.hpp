@@ -12,8 +12,12 @@
 #include <memory>
 #include <vector>
 
-VertexCollector basicVertexCollector() {
-  return VertexCollector({Position, Normal, Color});
+VertexDescriptor basicVertexDescriptor() {
+  VertexDescriptor vertexDescriptor;
+
+  vertexDescriptor.init({Position, Normal, Color});
+
+  return vertexDescriptor;
 }
 
 Camera createCamera(Dimensions dimensions) {
@@ -102,7 +106,7 @@ void createPipeline(Renderer &renderer, Scene *scene) {
 
   auto descriptorSetLayout = scene->descriptorSetLayout();
 
-  auto vertexCollector = basicVertexCollector();
+  auto vertexDescriptor = basicVertexDescriptor();
 
   if (*pipeline) {
     vkDestroyPipeline(device, *pipeline, nullptr);
@@ -154,10 +158,10 @@ void createPipeline(Renderer &renderer, Scene *scene) {
   // Vertex input
   VkVertexInputBindingDescription vertexInputBindingDescription{};
   vertexInputBindingDescription.binding = 0;
-  vertexInputBindingDescription.stride = vertexCollector.vertexStride();
+  vertexInputBindingDescription.stride = vertexDescriptor.vertexStride();
   vertexInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-  auto vertexAttributes = vertexCollector.vertexAttributes();
+  auto vertexAttributes = vertexDescriptor.vertexAttributes();
 
   std::vector<VkVertexInputAttributeDescription>
       vertexInputAttributeDescriptions;
@@ -188,9 +192,6 @@ void createPipeline(Renderer &renderer, Scene *scene) {
       vertexInputAttributeDescriptions.size();
   pipelineVertexInputStateCreateInfo.pVertexAttributeDescriptions =
       vertexInputAttributeDescriptions.data();
-
-  // VkPipelineVertexInputStateCreateInfo pipelineVertexInputStateCreateInfo =
-  //     vertexCollector.pipelineVertexInputStateCreateInfo();
 
   VkPipelineInputAssemblyStateCreateInfo pipelineInputAsseblyStateCreateInfo{
       VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
@@ -250,7 +251,8 @@ void createPipeline(Renderer &renderer, Scene *scene) {
 
   if (*descriptorSetLayout == VK_NULL_HANDLE) {
     std::cerr << "createPipeline: m_setLayoutFrame is VK_NULL_HANDLE "
-                 "(descriptor set layout missing)\n";
+                 "(descriptor set layout missing)"
+              << std::endl;
   }
 
   VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{
@@ -262,7 +264,7 @@ void createPipeline(Renderer &renderer, Scene *scene) {
 
   if (vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, nullptr,
                              pipelineLayout) != VK_SUCCESS) {
-    std::cerr << "vkCreatePipelineLayout failed\n";
+    std::cerr << "vkCreatePipelineLayout failed" << std::endl;
     vkDestroyShaderModule(device, vs, nullptr);
     vkDestroyShaderModule(device, fs, nullptr);
     std::abort();
@@ -304,7 +306,7 @@ void createPipeline(Renderer &renderer, Scene *scene) {
                                 pipeline) != VK_SUCCESS) {
     vkDestroyShaderModule(device, vs, nullptr);
     vkDestroyShaderModule(device, fs, nullptr);
-    std::cerr << "vkCreateGraphicsPipelines failed\n";
+    std::cerr << "vkCreateGraphicsPipelines failed" << std::endl;
     std::abort();
   }
 
@@ -379,12 +381,10 @@ void createUniformBuffers(Renderer &renderer, Scene *scene) {
 }
 
 std::vector<Model> createModels(Renderer &renderer) {
-  auto vertexCollector = basicVertexCollector();
-  GenerateCube(&vertexCollector);
-
-  auto model = vertexCollector.buildModel(renderer);
+  Model model = GenerateCube(renderer, basicVertexDescriptor());
 
   std::vector<Model> models = {model};
+
   return models;
 }
 
@@ -398,11 +398,11 @@ Scene LoadScene(Renderer &renderer) {
   // Next create uniform buffers.
   createUniformBuffers(renderer, &scene);
 
-  // Next create model.
-  auto models = createModels(renderer);
-
-  // Finally create Camera.
+  // Next create Camera.
   auto camera = createCamera(renderer.dimensions());
+
+  // Finally create model.
+  auto models = createModels(renderer);
 
   scene.init(renderer, camera, models, createPipeline, destroyPipeline);
 

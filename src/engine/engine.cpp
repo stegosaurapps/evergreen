@@ -16,7 +16,7 @@ bool Engine::init() {
 
   auto wh = m_window.win32Handles();
   if (!wh.hwnd || !wh.hinstance) {
-    std::cerr << "Engine: failed to get Win32 handles.\n";
+    std::cerr << "Engine: failed to get Win32 handles." << std::endl;
     return false;
   }
 
@@ -29,7 +29,7 @@ bool Engine::init() {
   bool enableValidation = true;
 
   if (!m_renderer.init(wh, startW, startH, enableValidation)) {
-    std::cerr << "Engine: renderer init failed.\n";
+    std::cerr << "Engine: renderer init failed." << std::endl;
     return false;
   }
 

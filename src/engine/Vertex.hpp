@@ -5,6 +5,7 @@
 #include "Model.hpp"
 
 #include <stddef.h>
+#include <string>
 #include <vector>
 
 class Renderer; // forward declaration
@@ -29,6 +30,21 @@ inline int AttributeCount(VertexAttribute vertexAttribute) {
     return 2;
   case VertexAttribute::Color:
     return 3;
+  }
+}
+
+inline std::string AttributeName(VertexAttribute vertexAttribute) {
+  switch (vertexAttribute) {
+  case VertexAttribute::Position:
+    return "Position";
+  case VertexAttribute::Normal:
+    return "Normal";
+  case VertexAttribute::Tangent:
+    return "Tangent";
+  case VertexAttribute::TextureCoordinate:
+    return "TextureCoordinate";
+  case VertexAttribute::Color:
+    return "Color";
   }
 }
 
@@ -71,10 +87,12 @@ inline std::vector<float> VertexAttributeData(Vertex vertex,
   }
 }
 
-class VertexCollector {
+class VertexDescriptor {
 public:
-  VertexCollector(std::vector<VertexAttribute> vertexAttributes);
-  ~VertexCollector() = default;
+  VertexDescriptor() = default;
+  ~VertexDescriptor() = default;
+
+  void init(std::vector<VertexAttribute> vertexAttributes);
 
   VkPipelineVertexInputStateCreateInfo pipelineVertexInputStateCreateInfo();
 
@@ -82,28 +100,35 @@ public:
 
   std::vector<VertexAttribute> vertexAttributes();
 
-  void insertVertex(Vertex vertex);
-  void addVertices(std::vector<Vertex> vertices);
-  void addIndices(std::vector<uint32_t> indices);
-
-  std::vector<float> rawVertexData();
-
-  Model buildModel(Renderer &renderer);
+  void print();
 
 private:
   std::vector<VertexAttribute> m_vertexAttributes;
+};
+
+class VertexCollector {
+public:
+  VertexCollector(VertexDescriptor vertexDescriptor);
+  ~VertexCollector() = default;
+
+  unsigned long long vertexStride();
+
+  std::vector<VertexAttribute> vertexAttributes();
+
+  void insertVertex(Vertex vertex);
+  void addVertices(std::vector<Vertex> vertices);
+  size_t vertexCount();
+  std::vector<float> rawVertexData();
+  void clearVertices();
+
+  void addIndices(std::vector<uint32_t> indices);
+  size_t indexCount();
+  std::vector<uint32_t> rawIndexData();
+  void clearIndices();
+
+private:
+  VertexDescriptor m_vertexDescriptor;
 
   std::vector<Vertex> m_vertices;
   std::vector<uint32_t> m_indices;
 };
-
-struct VertexColor {
-  float px, py, pz;
-  float nx, ny, nz;
-  float r, g, b;
-};
-
-static_assert(sizeof(VertexColor) == 36, "VertexColor must be 36 bytes");
-static_assert(offsetof(VertexColor, px) == 0, "pos offset");
-static_assert(offsetof(VertexColor, nx) == 12, "nrm offset");
-static_assert(offsetof(VertexColor, r) == 24, "col offset");
