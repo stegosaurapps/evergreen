@@ -24,7 +24,7 @@ Camera createCamera(Dimensions dimensions) {
   Camera camera;
   camera.setOrbitTarget({0.0f, 0.0f, 0.0f});
   camera.setOrbitRadius(4.0f);
-  camera.setOrbitAngles(0.0f, 0.35f);
+  camera.setOrbitAngles(0.0f, -0.35f);
   camera.setPerspective(1.04719755f, dimensions.ratio(), 0.1f, 200.0f);
   camera.lookAt({0.0f, 0.0f, 0.0f});
   camera.updateMatrices();

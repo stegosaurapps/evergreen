@@ -74,8 +74,7 @@ void Builder::generateMesh(Renderer &renderer) {
   Mesh mesh;
   mesh.init(indexCount, vertexBuffer, vertexMemory, indexBuffer, indexMemory);
 
-  // m_meshes.push_back(mesh);
-  m_meshes.push_back(std::move(mesh));
+  m_meshes.push_back(mesh);
 }
 
 Model Builder::buildModel(Renderer &renderer) {

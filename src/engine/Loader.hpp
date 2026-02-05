@@ -174,7 +174,7 @@ Model loadModel(Renderer &renderer, const char *filePath,
 
       if (!ExtractPrimitiveCPU(prim, vertices, indices)) {
         std::cout << "Skipping non-triangle or malformed." << std::endl;
-        continue; // skip non-triangle or malformed
+        continue;
       }
 
       builder.addVertices(vertices);

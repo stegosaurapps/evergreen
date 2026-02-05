@@ -23,9 +23,9 @@ VertexDescriptor basicVertexDescriptor() {
 
 Camera createCamera(Dimensions dimensions) {
   Camera camera;
-  camera.setOrbitTarget({0.0f, 0.0f, 0.0f});
-  camera.setOrbitRadius(4.0f);
-  camera.setOrbitAngles(0.0f, 0.35f);
+  camera.setOrbitTarget({0.0f, 2.0f, 0.0f});
+  camera.setOrbitRadius(6.0f);
+  camera.setOrbitAngles(0.0f, -0.45f);
   camera.setPerspective(1.04719755f, dimensions.ratio(), 0.1f, 200.0f);
   camera.lookAt({0.0f, 0.0f, 0.0f});
   camera.updateMatrices();
@@ -122,13 +122,13 @@ void createPipeline(Renderer &renderer, Scene *scene) {
   std::vector<char> vsBytes;
   std::vector<char> fsBytes;
 
-  if (!ReadFileBytes("shaders/test.vert.spv", vsBytes)) {
-    std::cerr << "Missing vertex shader shaders/test.vert.spv" << std::endl;
+  if (!ReadFileBytes("shaders/pbr.vert.spv", vsBytes)) {
+    std::cerr << "Missing vertex shader shaders/pbr.vert.spv" << std::endl;
     std::abort();
   }
 
-  if (!ReadFileBytes("shaders/test.frag.spv", fsBytes)) {
-    std::cerr << "Missing fragment shader shaders/test.frag.spv" << std::endl;
+  if (!ReadFileBytes("shaders/pbr.frag.spv", fsBytes)) {
+    std::cerr << "Missing fragment shader shaders/pbr.frag.spv" << std::endl;
     std::abort();
   }
 
@@ -388,12 +388,6 @@ std::vector<Model> createModels(Renderer &renderer) {
   std::vector<Model> models = {model};
 
   return models;
-
-  // Model model = GenerateCube(renderer, basicVertexDescriptor());
-
-  // std::vector<Model> models = {model};
-
-  // return models;
 }
 
 Scene LoadScene(Renderer &renderer) {
