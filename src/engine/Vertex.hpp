@@ -10,7 +10,7 @@
 
 class Renderer; // forward declaration
 
-enum VertexAttribute {
+enum class VertexAttribute {
   Position,
   Normal,
   Tangent,
@@ -77,11 +77,12 @@ inline void PrintVertex(Vertex *vertex) {
             << vertex->pz << ")" << std::endl;
   std::cout << "  Normal: (" << vertex->nx << ", " << vertex->ny << ", "
             << vertex->nz << ")" << std::endl;
-  // std::cout << "  Tangent: (" << vertex->px << ", " << vertex->py << ", " <<
-  // vertex->pz << ")" << std::endl; std::cout << "  Texture Coordinate: (" <<
-  // vertex->px << ", " << vertex->py << ", " << vertex->pz << ")" << std::endl;
-  std::cout << "  Color: (" << vertex->r << ", " << vertex->g << ", "
-            << vertex->b << ")" << std::endl;
+  std::cout << "  Tangent: (" << vertex->tx << ", " << vertex->ty << ", "
+            << vertex->tz << ", " << vertex->tw << ")" << std::endl;
+  std::cout << "  Texture Coordinate: (" << vertex->ux << ", " << vertex->uy
+            << ")" << std::endl;
+  // std::cout << "  Color: (" << vertex->r << ", " << vertex->g << ", "
+  //           << vertex->b << ")" << std::endl;
   std::cout << "--------------------" << std::endl;
 }
 
@@ -93,9 +94,9 @@ inline std::vector<float> VertexAttributeData(Vertex vertex,
   case VertexAttribute::Normal:
     return {vertex.nx, vertex.ny, vertex.nz};
   case VertexAttribute::Tangent:
-    return {vertex.px, vertex.py, vertex.pz};
-  case VertexAttribute::TextureCoordinate:
     return {vertex.tx, vertex.ty, vertex.tz, vertex.tw};
+  case VertexAttribute::TextureCoordinate:
+    return {vertex.ux, vertex.uy};
   case VertexAttribute::Color:
     return {vertex.r, vertex.g, vertex.b};
   }
@@ -146,3 +147,11 @@ private:
   std::vector<Vertex> m_vertices;
   std::vector<uint32_t> m_indices;
 };
+
+inline void PrintVertexDescriptor(VertexDescriptor *vertexDescriptor) {
+  std::cout << "------ VERTEX DESCRIPTOR ------" << std::endl;
+  for (auto vertexAttribute : vertexDescriptor->vertexAttributes()) {
+    std::cout << "  " << AttributeName(vertexAttribute) << std::endl;
+  }
+  std::cout << "-------------------------------" << std::endl;
+}

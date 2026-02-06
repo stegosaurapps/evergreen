@@ -15,7 +15,8 @@
 VertexDescriptor basicVertexDescriptor() {
   VertexDescriptor vertexDescriptor;
 
-  vertexDescriptor.init({Position, Normal, Color});
+  vertexDescriptor.init({VertexAttribute::Position, VertexAttribute::Normal,
+                         VertexAttribute::Color});
 
   return vertexDescriptor;
 }

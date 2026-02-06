@@ -2,10 +2,12 @@
 
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inNormal;
-layout(location = 2) in vec3 inColor;
+layout(location = 2) in vec4 inTangent;
+layout(location = 3) in vec2 inUV;
 
 layout(location = 0) out vec3 vNormal;
-layout(location = 1) out vec3 vColor;
+layout(location = 1) out vec4 vTangent;
+layout(location = 2) out vec2 vUV;
 
 layout(set = 0, binding = 0) uniform CameraUBO {
   mat4 view;
@@ -24,5 +26,7 @@ void main() {
 
   vNormal = inNormal;
     
-  vColor = inColor;
+  vTangent = inTangent;
+
+  vUV = inUV;
 }

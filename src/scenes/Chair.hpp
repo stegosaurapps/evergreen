@@ -16,7 +16,11 @@
 VertexDescriptor basicVertexDescriptor() {
   VertexDescriptor vertexDescriptor;
 
-  vertexDescriptor.init({Position, Normal, Color});
+  vertexDescriptor.init({VertexAttribute::Position, VertexAttribute::Normal,
+                         VertexAttribute::Tangent,
+                         VertexAttribute::TextureCoordinate});
+  // vertexDescriptor.init({VertexAttribute::Position, VertexAttribute::Normal,
+  // VertexAttribute::Color});
 
   return vertexDescriptor;
 }
@@ -108,6 +112,7 @@ void createPipeline(Renderer &renderer, Scene *scene) {
   auto descriptorSetLayout = scene->descriptorSetLayout();
 
   auto vertexDescriptor = basicVertexDescriptor();
+  PrintVertexDescriptor(&vertexDescriptor);
 
   if (*pipeline) {
     vkDestroyPipeline(device, *pipeline, nullptr);
@@ -170,6 +175,9 @@ void createPipeline(Renderer &renderer, Scene *scene) {
   uint32_t offset = 0;
   for (int i = 0; i < vertexAttributes.size(); i++) {
     auto vertexAttribute = vertexAttributes[i];
+
+    std::cout << "Adding vertex attribute: " << AttributeName(vertexAttribute)
+              << " with offset: " << offset << std::endl;
 
     uint32_t attributeSize = sizeof(float) * AttributeCount(vertexAttribute);
 

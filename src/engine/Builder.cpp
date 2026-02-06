@@ -7,6 +7,10 @@
 Builder::Builder(VertexDescriptor vertexDescriptor)
     : m_vertexCollector(VertexCollector(vertexDescriptor)) {}
 
+unsigned long long Builder::vertexStride() {
+  return m_vertexCollector.vertexStride();
+}
+
 void Builder::insertVertex(Vertex vertex) {
   m_vertexCollector.insertVertex(vertex);
 }
