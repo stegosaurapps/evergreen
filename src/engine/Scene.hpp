@@ -47,7 +47,7 @@ public:
   std::array<VkDeviceMemory, FRAME_COUNT> *uboMemoryList();
   std::array<void *, FRAME_COUNT> *uboMappedList();
 
-  void shutdown();
+  void shutdown(Renderer &renderer);
 
 private:
   Camera m_camera;

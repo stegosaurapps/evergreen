@@ -1,15 +1,19 @@
 #include "Mesh.hpp"
+#include "Renderer.hpp"
 
 #include <iostream>
 
 void Mesh::init(uint32_t indexCount, VkBuffer vertexBuffer,
                 VkDeviceMemory vertexMemory, VkBuffer indexBuffer,
-                VkDeviceMemory indexMemory) {
+                VkDeviceMemory indexMemory, Material *material) {
   m_indexCount = indexCount;
+
   m_vertexBuffer = vertexBuffer;
   m_vertexMemory = vertexMemory;
   m_indexBuffer = indexBuffer;
   m_indexMemory = indexMemory;
+
+  m_material = material;
 }
 
 uint32_t Mesh::indexCount() { return m_indexCount; }
@@ -22,7 +26,13 @@ VkBuffer Mesh::indexBuffer() { return m_indexBuffer; }
 
 VkDeviceMemory Mesh::indexMemory() { return m_indexMemory; }
 
-void Mesh::clear() {}
+void Mesh::clear(Renderer &renderer) {
+  // Clear resources...
+
+  if (m_material != nullptr) {
+    free(m_material);
+  }
+}
 
 // void Mesh::destroyResources(Renderer &renderer) {
 //   auto device = renderer.device();

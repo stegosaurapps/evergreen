@@ -4,6 +4,8 @@
 
 #include <vector>
 
+class Renderer; // forward declaration
+
 class Model {
 public:
   Model() = default;
@@ -13,9 +15,8 @@ public:
 
   std::vector<Mesh> &meshes();
 
-  void clear();
+  void clear(Renderer &renderer);
 
 private:
   std::vector<Mesh> m_meshes;
-  // This is where the textures go
 };

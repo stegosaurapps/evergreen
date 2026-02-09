@@ -20,13 +20,13 @@ bool Engine::init() {
     return false;
   }
 
-  //   bool enableValidation =
-  // #if defined(_DEBUG)
-  //       true;
-  // #else
-  //       false;
-  // #endif
-  bool enableValidation = true;
+  bool enableValidation =
+#if defined(_DEBUG)
+      true;
+#else
+      false;
+#endif
+  // bool enableValidation = true;
 
   if (!m_renderer.init(wh, startW, startH, enableValidation)) {
     std::cerr << "Engine: renderer init failed." << std::endl;
@@ -68,8 +68,12 @@ void Engine::tick() {
 }
 
 void Engine::shutdown() {
-  // Order matters, scene depends on renderer, and renderer depends on window.
-  m_scene.get()->shutdown();
+  // Scene depends on renderer.
+  m_scene.get()->shutdown(m_renderer);
+
+  // Renderer depends on window.
   m_renderer.shutdown();
+
+  // Window is the last to go.
   m_window.shutdown();
 }

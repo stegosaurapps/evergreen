@@ -76,7 +76,8 @@ void Builder::generateMesh(Renderer &renderer) {
   m_vertexCollector.clearIndices();
 
   Mesh mesh;
-  mesh.init(indexCount, vertexBuffer, vertexMemory, indexBuffer, indexMemory);
+  mesh.init(indexCount, vertexBuffer, vertexMemory, indexBuffer, indexMemory,
+            nullptr);
 
   m_meshes.push_back(mesh);
 }

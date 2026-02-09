@@ -74,7 +74,12 @@ std::array<void *, FRAME_COUNT> *Scene::uboMappedList() {
   return &m_uboMappedList;
 }
 
-void Scene::shutdown() {
-  // m_destroyPipeline();
-  // destroyResources();
+void Scene::shutdown(Renderer &renderer) {
+  for (auto model : m_models) {
+    model.clear(renderer);
+  }
+
+  // Clear resources...
+
+  m_destroyPipeline(renderer, this);
 }
