@@ -407,7 +407,5 @@ Scene LoadScene(Renderer &renderer) {
 
   scene.init(renderer, camera, models, createPipeline, destroyPipeline);
 
-  // loadModel("./assets/model/chair/chair.glb");
-
   return scene;
 }

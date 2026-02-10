@@ -390,8 +390,9 @@ void createUniformBuffers(Renderer &renderer, Scene *scene) {
 }
 
 std::vector<Model> createModels(Renderer &renderer) {
-  auto model = loadModel(renderer, "./assets/model/chair/chair.glb",
-                         basicVertexDescriptor());
+  auto model =
+      loadModel(renderer, basicVertexDescriptor(),
+                "./assets/model/chair/chair.gltf", "./assets/model/chair/");
 
   std::vector<Model> models = {model};
 
@@ -415,8 +416,6 @@ Scene LoadScene(Renderer &renderer) {
   auto models = createModels(renderer);
 
   scene.init(renderer, camera, models, createPipeline, destroyPipeline);
-
-  // loadModel("./assets/model/chair/chair.glb");
 
   return scene;
 }

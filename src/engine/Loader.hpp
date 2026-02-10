@@ -15,6 +15,81 @@
 #include <iostream>
 #include <vector>
 
+static const cgltf_image *
+GetImageFromTexView(const cgltf_texture_view &rawTextureView) {
+  if (!rawTextureView.texture || !rawTextureView.texture->image) {
+    std::cout << "texture or texture image not available" << std::endl;
+
+    return nullptr;
+  } else {
+    std::cout << "rawTextureView.texture->name: "
+              << rawTextureView.texture->name << std::endl;
+
+    // std::cout << "!rawTextureView.texture: " << !rawTextureView.texture
+    //           << std::endl;
+    // std::cout << "!rawTextureView.texture->image: "
+    //           << !rawTextureView.texture->image << std::endl;
+    // std::cout << "raw texture is not available, or raw texture image is not "
+    //              "available..."
+    //           << std::endl;
+  }
+
+  return rawTextureView.texture->image;
+}
+
+static Material *GenerateMaterial(Renderer &renderer,
+                                  // TextureCache& cache,
+                                  const cgltf_material *rawMaterial,
+                                  const char *baseDirectory) {
+  if (!rawMaterial) {
+    return nullptr;
+  }
+
+  // auto out = std::make_shared<MaterialTextures>();
+
+  // Albedo (sRGB)
+  if (rawMaterial->has_pbr_metallic_roughness) {
+    const cgltf_image *albedoImg = GetImageFromTexView(
+        rawMaterial->pbr_metallic_roughness.base_color_texture);
+
+    // out->albedo = LoadGpuTextureFromCgltfImage(
+    //     renderer, cache, albedoImg, base_dir,
+    //     VK_FORMAT_R8G8B8A8_SRGB, /*genMips=*/true);
+  }
+
+  // Normal (linear UNORM)
+  {
+    const cgltf_image *normalImg =
+        GetImageFromTexView(rawMaterial->normal_texture);
+
+    // out->normal = LoadGpuTextureFromCgltfImage(
+    //     renderer, cache, normalImg, base_dir,
+    //     VK_FORMAT_R8G8B8A8_UNORM, true);
+  }
+
+  // // Metallic + Roughness: glTF usually packs them into ONE texture
+  // std::shared_ptr<GpuTexture> mrPacked;
+  // if (rawMaterial->has_pbr_metallic_roughness) {
+  //   const cgltf_image* mrImg =
+  //       GetImageFromTexView(mat->pbr_metallic_roughness.metallic_roughness_texture);
+
+  //   mrPacked = LoadGpuTextureFromCgltfImage(
+  //       renderer, cache, mrImg, base_dir,
+  //       VK_FORMAT_R8G8B8A8_UNORM, true);
+  // }
+
+  // // Your slots:
+  // out->roughness = mrPacked; // alias
+  // out->metallic  = mrPacked; // alias
+
+  // // If you truly have separate metallic/roughness textures (nonstandard),
+  // // you can override out->roughness / out->metallic here when you detect
+  // them.
+
+  // if (!out->albedo && !out->normal && !out->roughness && !out->metallic)
+  // return nullptr; return out;
+}
+
 // Find an attribute accessor on a primitive (e.g. POSITION, NORMAL, TEXCOORD_0)
 static const cgltf_accessor *FindAttr(const cgltf_primitive &prim,
                                       cgltf_attribute_type type,
@@ -144,8 +219,8 @@ static bool ExtractPrimitiveCPU(const cgltf_primitive &prim,
   return true;
 }
 
-Model loadModel(Renderer &renderer, const char *filePath,
-                VertexDescriptor vertexDescriptor) {
+Model loadModel(Renderer &renderer, VertexDescriptor vertexDescriptor,
+                const char *filePath, const char *baseDirectory) {
   Builder builder = Builder(vertexDescriptor);
 
   cgltf_options options{};
@@ -158,9 +233,7 @@ Model loadModel(Renderer &renderer, const char *filePath,
     std::abort();
   }
 
-  // For .glb, this is usually enough, but still call it to be safe.
-  // Base dir resolves external resources if any exist.
-  result = cgltf_load_buffers(&options, data, /*base_dir*/ nullptr);
+  result = cgltf_load_buffers(&options, data, baseDirectory);
   if (result != cgltf_result_success) {
     std::cerr << "cgltf_load_buffers " << filePath << " failed: " << (int)result
               << std::endl;
@@ -173,6 +246,8 @@ Model loadModel(Renderer &renderer, const char *filePath,
               << std::endl;
     std::abort();
   }
+
+  // TextureCache texCache;
 
   for (cgltf_size mi = 0; mi < data->meshes_count; mi++) {
     const cgltf_mesh &mesh = data->meshes[mi];
@@ -188,8 +263,7 @@ Model loadModel(Renderer &renderer, const char *filePath,
         continue;
       }
 
-      // std::cout << "Mesh #" << mi << " last vertex: " << std::endl;
-      // PrintVertex(&vertices[vertices.size() - 1]);
+      // auto materialTex = GenerateMaterial(renderer, prim.material, filePath);
 
       builder.addVertices(vertices);
       builder.addIndices(indices);
@@ -198,10 +272,7 @@ Model loadModel(Renderer &renderer, const char *filePath,
     }
   }
 
-  auto vertexStride = builder.vertexStride();
-  // uint32_t attributeSize = sizeof(float) * AttributeCount(vertexAttribute);
-
-  std::cout << "vertex stride: " << vertexStride << std::endl;
+  // cgltf_free(data);
 
   return builder.buildModel(renderer);
 }
