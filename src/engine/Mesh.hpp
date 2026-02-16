@@ -23,6 +23,8 @@ public:
   VkBuffer indexBuffer();
   VkDeviceMemory indexMemory();
 
+  Material *material();
+
   void clear(Renderer &renderer);
 
 private:

@@ -26,6 +26,8 @@ VkBuffer Mesh::indexBuffer() { return m_indexBuffer; }
 
 VkDeviceMemory Mesh::indexMemory() { return m_indexMemory; }
 
+Material *Mesh::material() { return m_material; }
+
 void Mesh::clear(Renderer &renderer) {
   // Clear resources...
 

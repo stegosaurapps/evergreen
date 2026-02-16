@@ -4,6 +4,10 @@
 #define CGLTF_IMPLEMENTATION
 #endif
 
+#ifndef STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_IMPLEMENTATION
+#endif
+
 #include "Builder.hpp"
 #include "Renderer.hpp"
 #include "Vertex.hpp"
@@ -28,26 +32,28 @@ static bool ReadAllBytes(const char *path, std::vector<uint8_t> &out) {
   return true;
 }
 
-static bool GetImageBytesFromCgltf(const cgltf_image *img,
+static bool GetImageBytesFromCgltf(const cgltf_image *image,
                                    const char *baseDirectory,
                                    std::vector<uint8_t> &outBytes) {
   outBytes.clear();
-  if (!img)
+  if (!image) {
     return false;
+  }
 
   // URI path
-  if (img->uri && img->uri[0] != '\0') {
-    std::string full = std::string(baseDirectory) + std::string(img->uri);
+  if (image->uri && image->uri[0] != '\0') {
+    std::string full = std::string(baseDirectory) + std::string(image->uri);
     return ReadAllBytes(full.c_str(), outBytes);
   }
 
   // Embedded (buffer_view)
-  if (img->buffer_view && img->buffer_view->buffer &&
-      img->buffer_view->buffer->data) {
-    const cgltf_buffer_view *bv = img->buffer_view;
+  if (image->buffer_view && image->buffer_view->buffer &&
+      image->buffer_view->buffer->data) {
+    const cgltf_buffer_view *bv = image->buffer_view;
     const uint8_t *base = (const uint8_t *)bv->buffer->data;
     outBytes.resize((size_t)bv->size);
     memcpy(outBytes.data(), base + (size_t)bv->offset, (size_t)bv->size);
+
     return true;
   }
 
@@ -68,12 +74,13 @@ static bool DecodeToRGBA8(const std::vector<uint8_t> &bytes,
   return true;
 }
 
-static bool LoadCgltfImageAsTexture(Renderer &renderer, const cgltf_image *img,
+static bool LoadCgltfImageAsTexture(Renderer &renderer,
+                                    const cgltf_image *image,
                                     const char *baseDirectory,
                                     VkFormat format, // SRGB or UNORM
                                     Texture &outTex) {
   std::vector<uint8_t> fileBytes;
-  if (!GetImageBytesFromCgltf(img, baseDirectory, fileBytes))
+  if (!GetImageBytesFromCgltf(image, baseDirectory, fileBytes))
     return false;
 
   std::vector<uint8_t> rgba;
@@ -97,49 +104,38 @@ static Material *GenerateMaterial(Renderer &renderer,
                                   const cgltf_material *rawMaterial,
                                   const char *baseDirectory) {
   if (!rawMaterial) {
-    std::cout << "!rawMaterial" << std::endl;
-
     return nullptr;
   }
 
-  // auto out = std::make_shared<MaterialTextures>();
-
-  // Albedo (sRGB)
-  if (rawMaterial->has_pbr_metallic_roughness) {
-    std::cout << "if (rawMaterial->has_pbr_metallic_roughness)" << std::endl;
-
-    const cgltf_image *albedoImgage = GetImageFromTexView(
-        rawMaterial->pbr_metallic_roughness.base_color_texture);
-
-    if (albedoImgage == nullptr) {
-      std::cout << "Albedo texture not found..." << std::endl;
-    } else {
-      std::cout << "We got an albedo texture!!!" << std::endl;
-    }
-
-    const cgltf_image *metallicImage = GetImageFromTexView(
-        rawMaterial->pbr_metallic_roughness.metallic_roughness_texture);
-
-    if (metallicImage == nullptr) {
-      std::cout << "Metallic texture not found..." << std::endl;
-    } else {
-      std::cout << "We got an Metallic texture!!!" << std::endl;
-    }
+  if (!rawMaterial->has_pbr_metallic_roughness) {
+    std::cout << "if (!rawMaterial->has_pbr_metallic_roughness)" << std::endl;
+    return nullptr;
   }
 
-  // Normal (linear UNORM)
+  const cgltf_image *albedoImage = GetImageFromTexView(
+      rawMaterial->pbr_metallic_roughness.base_color_texture);
+
+  const cgltf_image *metallicImage = GetImageFromTexView(
+      rawMaterial->pbr_metallic_roughness.metallic_roughness_texture);
+
   const cgltf_image *normalImage =
       GetImageFromTexView(rawMaterial->normal_texture);
 
-  if (normalImage == nullptr) {
-    std::cout << "Noraml texture not found..." << std::endl;
-  } else {
-    std::cout << "We got an Normal texture!!!" << std::endl;
-  }
-
   Material *material = new Material();
 
-  // material->init();
+  Texture albedoTexture;
+  LoadCgltfImageAsTexture(renderer, albedoImage, baseDirectory,
+                          VK_FORMAT_R8G8B8A8_SRGB, albedoTexture);
+
+  Texture metallicTexture;
+  LoadCgltfImageAsTexture(renderer, metallicImage, baseDirectory,
+                          VK_FORMAT_R8G8B8A8_UNORM, metallicTexture);
+
+  Texture normalTexture;
+  LoadCgltfImageAsTexture(renderer, normalImage, baseDirectory,
+                          VK_FORMAT_R8G8B8A8_UNORM, normalTexture);
+
+  material->init(albedoTexture, metallicTexture, normalTexture);
 
   return material;
 }
@@ -317,10 +313,12 @@ Model loadModel(Renderer &renderer, VertexDescriptor vertexDescriptor,
         continue;
       }
 
-      auto materialTex = GenerateMaterial(renderer, prim.material, filePath);
-
       builder.addVertices(vertices);
       builder.addIndices(indices);
+
+      Material *material = GenerateMaterial(renderer, prim.material, filePath);
+
+      builder.addMaterial(material);
 
       builder.generateMesh(renderer);
     }

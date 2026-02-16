@@ -5,6 +5,8 @@
 #include "Renderer.hpp"
 #include "Vertex.hpp"
 
+class Material; // forward declaration
+
 class Builder {
 public:
   Builder(VertexDescriptor vertexDescriptor);
@@ -16,6 +18,8 @@ public:
   void addVertices(std::vector<Vertex> vertices);
   void addIndices(std::vector<uint32_t> indices);
 
+  void addMaterial(Material *material);
+
   void generateMesh(Renderer &renderer);
 
   Model buildModel(Renderer &renderer);
@@ -25,5 +29,5 @@ private:
 
   std::vector<Mesh> m_meshes;
 
-  // Texture stuff will go here...
+  Material *m_material;
 };

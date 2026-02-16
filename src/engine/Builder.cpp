@@ -1,6 +1,7 @@
 #include "../Vulkan.hpp"
 
 #include "Builder.hpp"
+#include "Material.hpp"
 
 #include <iostream>
 
@@ -22,6 +23,8 @@ void Builder::addVertices(std::vector<Vertex> vertices) {
 void Builder::addIndices(std::vector<uint32_t> indices) {
   m_vertexCollector.addIndices(indices);
 }
+
+void Builder::addMaterial(Material *material) { m_material = material; }
 
 void Builder::generateMesh(Renderer &renderer) {
   auto physicalDevice = renderer.physicalDevice();
@@ -77,7 +80,9 @@ void Builder::generateMesh(Renderer &renderer) {
 
   Mesh mesh;
   mesh.init(indexCount, vertexBuffer, vertexMemory, indexBuffer, indexMemory,
-            nullptr);
+            m_material);
+
+  m_material = nullptr;
 
   m_meshes.push_back(mesh);
 }

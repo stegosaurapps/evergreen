@@ -12,14 +12,13 @@ public:
   Material() = default;
   ~Material() = default;
 
-  void init(Texture albedoTexture, Texture roughnessTexture,
-            Texture metallicTexture, Texture normalTexture);
+  void init(Texture albedoTexture, Texture metallicRoughnessTexture,
+            Texture normalTexture);
 
   void clear();
 
 private:
   std::unique_ptr<Texture> m_albedoTexture = nullptr;
-  std::unique_ptr<Texture> m_roughnessTexture = nullptr;
-  std::unique_ptr<Texture> m_metallicTexture = nullptr;
+  std::unique_ptr<Texture> m_metallicRoughnessTexture = nullptr;
   std::unique_ptr<Texture> m_normalTexture = nullptr;
 };

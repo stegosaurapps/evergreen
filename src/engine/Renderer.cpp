@@ -944,6 +944,11 @@ void Renderer::recordCommandBuffer(VkCommandBuffer commandBuffer,
   // model/mesh rendering.
   for (Model &model : scene->models()) {
     for (Mesh &mesh : model.meshes()) {
+      Material *material = mesh.material();
+      if (material != nullptr) {
+        // std::cout << "The mesh has a material!!!" << std::endl;
+      }
+
       VkBuffer vertexBuffer = mesh.vertexBuffer();
       VkBuffer indexBuffer = mesh.indexBuffer();
       uint32_t indexCount = mesh.indexCount();
