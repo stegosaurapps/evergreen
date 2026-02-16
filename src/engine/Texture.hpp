@@ -13,6 +13,10 @@ public:
             VkFormat format, VkImage image, VkDeviceMemory memory,
             VkImageView view, VkSampler sampler);
 
+  VkImage image();
+  VkImageView view();
+  VkSampler sampler();
+
   void clear();
 
 private:

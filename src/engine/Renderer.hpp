@@ -30,6 +30,7 @@ public:
   VkSampleCountFlagBits sampleCount();
   VkRenderPass renderPass();
   VkCommandPool commandPool();
+  VkDescriptorPool materialDescriptorPool();
   VkQueue grapicsQueue();
 
   void resize(int width, int height);
@@ -44,7 +45,7 @@ private:
   int m_width = 0;
   int m_height = 0;
 
-  std::array<float, 3> m_clearColor = {0.0, 0.0, 1.0}; // {0.10, 0.16, 0.18};
+  std::array<float, 3> m_clearColor = {0.0, 0.0, 0.0}; // {0.10, 0.16, 0.18};
 
   VkInstance m_instance = VK_NULL_HANDLE;
 
@@ -84,6 +85,8 @@ private:
 
   VkCommandPool m_commandPool = VK_NULL_HANDLE;
 
+  VkDescriptorPool m_materialDescriptorPool = VK_NULL_HANDLE;
+
   int m_frameIndex = 0;
   std::array<VkCommandBuffer, FRAME_COUNT> m_cmd{};
   std::array<VkSemaphore, FRAME_COUNT> m_imageAvailable{};
@@ -102,6 +105,7 @@ private:
   void createDepthResources();
   void createFramebuffers();
   void createCommandPool();
+  void createMaterialDescriptorPool();
   void createCommandBuffers();
   void createSyncObjects();
 

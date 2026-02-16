@@ -446,15 +446,16 @@ static VkSampler CreateSampler2D(VkDevice device) {
   return sampler;
 }
 
-static bool
-CreateTextureFromRGBA8(VkPhysicalDevice physicalDevice, VkDevice device,
-                       VkCommandPool commandPool, VkQueue graphicsQueue,
-                       const uint8_t *rgbaPixels, uint32_t width,
-                       uint32_t height,
-                       VkFormat format, // VK_FORMAT_R8G8B8A8_UNORM or _SRGB
-                       Texture &outTex) {
-  if (!rgbaPixels || width == 0 || height == 0)
-    return false;
+static Texture CreateTextureFromRGBA8(VkPhysicalDevice physicalDevice,
+                                      VkDevice device,
+                                      VkCommandPool commandPool,
+                                      VkQueue graphicsQueue,
+                                      const uint8_t *rgbaPixels, uint32_t width,
+                                      uint32_t height, VkFormat format) {
+  if (!rgbaPixels || width == 0 || height == 0) {
+    std::cerr << "!rgbaPixels || width == 0 || height == 0" << std::endl;
+    std::abort();
+  }
 
   const VkDeviceSize uploadSize =
       (VkDeviceSize)width * (VkDeviceSize)height * 4;
@@ -467,7 +468,8 @@ CreateTextureFromRGBA8(VkPhysicalDevice physicalDevice, VkDevice device,
                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                     stagingBuffer, stagingMemory)) {
-    return false;
+    std::cerr << "!CreateBuffer" << std::endl;
+    std::abort();
   }
 
   void *mapped = nullptr;
@@ -485,7 +487,8 @@ CreateTextureFromRGBA8(VkPhysicalDevice physicalDevice, VkDevice device,
     vkDestroyBuffer(device, stagingBuffer, nullptr);
     vkFreeMemory(device, stagingMemory, nullptr);
 
-    return false;
+    std::cerr << "!CreateImage2D" << std::endl;
+    std::abort();
   }
 
   // 3) copy + transitions
@@ -511,17 +514,25 @@ CreateTextureFromRGBA8(VkPhysicalDevice physicalDevice, VkDevice device,
   vkFreeMemory(device, stagingMemory, nullptr);
 
   if (view == VK_NULL_HANDLE || sampler == VK_NULL_HANDLE) {
-    if (sampler)
+    if (sampler) {
       vkDestroySampler(device, sampler, nullptr);
-    if (view)
-      vkDestroyImageView(device, view, nullptr);
-    vkDestroyImage(device, image, nullptr);
-    vkFreeMemory(device, imageMemory, nullptr);
+    }
 
-    return false;
+    if (view) {
+      vkDestroyImageView(device, view, nullptr);
+      vkDestroyImage(device, image, nullptr);
+
+      vkFreeMemory(device, imageMemory, nullptr);
+    }
+
+    std::cerr << "!GetImageBytesFromCgltf(image, baseDirectory, fileBytes)"
+              << std::endl;
+    std::abort();
   }
 
-  outTex.init(width, height, 1, format, image, imageMemory, view, sampler);
+  Texture texture;
 
-  return true;
+  texture.init(width, height, 1, format, image, imageMemory, view, sampler);
+
+  return texture;
 }

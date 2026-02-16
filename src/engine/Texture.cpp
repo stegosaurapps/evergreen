@@ -17,6 +17,12 @@ void Texture::init(uint32_t width, uint32_t height, uint32_t mipLevels,
   m_sampler = sampler;
 }
 
+VkImage Texture::image() { return m_image; }
+
+VkImageView Texture::view() { return m_view; }
+
+VkSampler Texture::sampler() { return m_sampler; }
+
 void Texture::clear() {
   // if (m_sampler) { vkDestroySampler(device, m_sampler, nullptr); m_sampler =
   // VK_NULL_HANDLE; } if (m_view)    { vkDestroyImageView(device, m_view,

@@ -43,6 +43,7 @@ bool Renderer::init(const Win32WindowHandles &windowHandler, int width,
   createDepthResources();
   createFramebuffers();
   createCommandPool();
+  createMaterialDescriptorPool();
   createCommandBuffers();
   createSyncObjects();
 
@@ -66,6 +67,10 @@ VkSampleCountFlagBits Renderer::sampleCount() { return m_sampleCount; }
 VkRenderPass Renderer::renderPass() { return m_renderPass; }
 
 VkCommandPool Renderer::commandPool() { return m_commandPool; };
+
+VkDescriptorPool Renderer::materialDescriptorPool() {
+  return m_materialDescriptorPool;
+}
 
 VkQueue Renderer::grapicsQueue() { return m_graphicsQueue; }
 
@@ -172,6 +177,11 @@ void Renderer::shutdown() {
   if (m_commandPool) {
     vkDestroyCommandPool(m_device, m_commandPool, nullptr);
     m_commandPool = VK_NULL_HANDLE;
+  }
+
+  if (m_materialDescriptorPool) {
+    vkDestroyDescriptorPool(m_device, m_materialDescriptorPool, nullptr);
+    m_materialDescriptorPool = VK_NULL_HANDLE;
   }
 
   destroySwapchain();
@@ -820,6 +830,32 @@ void Renderer::createCommandPool() {
   }
 }
 
+void Renderer::createMaterialDescriptorPool() {
+  if (m_materialDescriptorPool == VK_NULL_HANDLE) {
+    const uint32_t kMaxMaterials = 256; // showcase number
+
+    VkDescriptorPoolSize descriptorPoolSize{};
+    descriptorPoolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    descriptorPoolSize.descriptorCount =
+        kMaxMaterials * 3; // 3 textures per material
+
+    VkDescriptorPoolCreateInfo descriptorPoolCreateInfo{
+        VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+    descriptorPoolCreateInfo.maxSets = kMaxMaterials;
+    descriptorPoolCreateInfo.poolSizeCount = 1;
+    descriptorPoolCreateInfo.pPoolSizes = &descriptorPoolSize;
+
+    VkDescriptorPool materialDescriptorPool = VK_NULL_HANDLE;
+    if (vkCreateDescriptorPool(m_device, &descriptorPoolCreateInfo, nullptr,
+                               &materialDescriptorPool) != VK_SUCCESS) {
+      std::cerr << "Failed to create material descriptor pool" << std::endl;
+      std::abort();
+    }
+
+    m_materialDescriptorPool = materialDescriptorPool;
+  }
+}
+
 void Renderer::createCommandBuffers() {
   VkCommandBufferAllocateInfo commandBufferAllocateInfo{};
   commandBufferAllocateInfo.sType =
@@ -946,7 +982,11 @@ void Renderer::recordCommandBuffer(VkCommandBuffer commandBuffer,
     for (Mesh &mesh : model.meshes()) {
       Material *material = mesh.material();
       if (material != nullptr) {
-        // std::cout << "The mesh has a material!!!" << std::endl;
+        VkDescriptorSet *materialDescriptorSet = material->descriptorSet();
+
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                pipelineLayout, 1, 1, materialDescriptorSet, 0,
+                                nullptr);
       }
 
       VkBuffer vertexBuffer = mesh.vertexBuffer();

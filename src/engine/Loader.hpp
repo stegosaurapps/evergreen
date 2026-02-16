@@ -46,17 +46,6 @@ static bool GetImageBytesFromCgltf(const cgltf_image *image,
     return ReadAllBytes(full.c_str(), outBytes);
   }
 
-  // Embedded (buffer_view)
-  if (image->buffer_view && image->buffer_view->buffer &&
-      image->buffer_view->buffer->data) {
-    const cgltf_buffer_view *bv = image->buffer_view;
-    const uint8_t *base = (const uint8_t *)bv->buffer->data;
-    outBytes.resize((size_t)bv->size);
-    memcpy(outBytes.data(), base + (size_t)bv->offset, (size_t)bv->size);
-
-    return true;
-  }
-
   return false;
 }
 
@@ -74,24 +63,27 @@ static bool DecodeToRGBA8(const std::vector<uint8_t> &bytes,
   return true;
 }
 
-static bool LoadCgltfImageAsTexture(Renderer &renderer,
-                                    const cgltf_image *image,
-                                    const char *baseDirectory,
-                                    VkFormat format, // SRGB or UNORM
-                                    Texture &outTex) {
+static Texture LoadCgltfImageAsTexture(Renderer &renderer,
+                                       const cgltf_image *image,
+                                       const char *baseDirectory,
+                                       VkFormat format) {
   std::vector<uint8_t> fileBytes;
-  if (!GetImageBytesFromCgltf(image, baseDirectory, fileBytes))
-    return false;
+  if (!GetImageBytesFromCgltf(image, baseDirectory, fileBytes)) {
+    std::cerr << "!GetImageBytesFromCgltf(image, baseDirectory, fileBytes)"
+              << std::endl;
+    std::abort();
+  }
 
   std::vector<uint8_t> rgba;
   int w = 0, h = 0;
-  if (!DecodeToRGBA8(fileBytes, rgba, w, h))
-    return false;
+  if (!DecodeToRGBA8(fileBytes, rgba, w, h)) {
+    std::cerr << "!DecodeToRGBA8(fileBytes, rgba, w, h)" << std::endl;
+    std::abort();
+  }
 
   return CreateTextureFromRGBA8(renderer.physicalDevice(), renderer.device(),
                                 renderer.commandPool(), renderer.grapicsQueue(),
-                                rgba.data(), (uint32_t)w, (uint32_t)h, format,
-                                outTex);
+                                rgba.data(), (uint32_t)w, (uint32_t)h, format);
 }
 
 static const cgltf_image *
@@ -99,8 +91,88 @@ GetImageFromTexView(const cgltf_texture_view &rawTextureView) {
   return rawTextureView.texture->image;
 }
 
+static VkDescriptorSet CreateMaterialDescriptorSet(
+    Renderer &renderer, VkDescriptorSetLayout materialSetLayout,
+    Texture &albedo, Texture &metalRough, Texture &normal) {
+  VkDevice device = renderer.device();
+  VkDescriptorPool pool = renderer.materialDescriptorPool();
+
+  if (pool == VK_NULL_HANDLE) {
+    std::cerr << "CreateMaterialDescriptorSet: "
+                 "renderer.materialDescriptorPool() is VK_NULL_HANDLE"
+              << std::endl;
+    std::abort();
+  }
+  if (materialSetLayout == VK_NULL_HANDLE) {
+    std::cerr
+        << "CreateMaterialDescriptorSet: materialSetLayout is VK_NULL_HANDLE"
+        << std::endl;
+    std::abort();
+  }
+
+  VkDescriptorSetAllocateInfo descriptorSetAllocateInfo{
+      VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+  descriptorSetAllocateInfo.descriptorPool = pool;
+  descriptorSetAllocateInfo.descriptorSetCount = 1;
+  descriptorSetAllocateInfo.pSetLayouts = &materialSetLayout;
+
+  VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
+  if (vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo,
+                               &descriptorSet) != VK_SUCCESS) {
+    std::cerr << "CreateMaterialDescriptorSet: vkAllocateDescriptorSets failed"
+              << std::endl;
+    std::abort();
+  }
+
+  // Must be valid (no null view/sampler)
+  VkDescriptorImageInfo albedoInfo{};
+  albedoInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  albedoInfo.imageView = albedo.view();
+  albedoInfo.sampler = albedo.sampler();
+
+  VkDescriptorImageInfo metallicRoughnessInfo{};
+  metallicRoughnessInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  metallicRoughnessInfo.imageView = metalRough.view();
+  metallicRoughnessInfo.sampler = metalRough.sampler();
+
+  VkDescriptorImageInfo normalInfo{};
+  normalInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  normalInfo.imageView = normal.view();
+  normalInfo.sampler = normal.sampler();
+
+  VkWriteDescriptorSet writeDescriptorSet[3]{};
+
+  writeDescriptorSet[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  writeDescriptorSet[0].dstSet = descriptorSet;
+  writeDescriptorSet[0].dstBinding = 0;
+  writeDescriptorSet[0].descriptorType =
+      VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  writeDescriptorSet[0].descriptorCount = 1;
+  writeDescriptorSet[0].pImageInfo = &albedoInfo;
+
+  writeDescriptorSet[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  writeDescriptorSet[1].dstSet = descriptorSet;
+  writeDescriptorSet[1].dstBinding = 1;
+  writeDescriptorSet[1].descriptorType =
+      VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  writeDescriptorSet[1].descriptorCount = 1;
+  writeDescriptorSet[1].pImageInfo = &metallicRoughnessInfo;
+
+  writeDescriptorSet[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  writeDescriptorSet[2].dstSet = descriptorSet;
+  writeDescriptorSet[2].dstBinding = 2;
+  writeDescriptorSet[2].descriptorType =
+      VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  writeDescriptorSet[2].descriptorCount = 1;
+  writeDescriptorSet[2].pImageInfo = &normalInfo;
+
+  vkUpdateDescriptorSets(device, 3, writeDescriptorSet, 0, nullptr);
+
+  return descriptorSet;
+}
+
 static Material *GenerateMaterial(Renderer &renderer,
-                                  // TextureCache& cache,
+                                  VkDescriptorSetLayout materialSetLayout,
                                   const cgltf_material *rawMaterial,
                                   const char *baseDirectory) {
   if (!rawMaterial) {
@@ -108,7 +180,6 @@ static Material *GenerateMaterial(Renderer &renderer,
   }
 
   if (!rawMaterial->has_pbr_metallic_roughness) {
-    std::cout << "if (!rawMaterial->has_pbr_metallic_roughness)" << std::endl;
     return nullptr;
   }
 
@@ -123,19 +194,21 @@ static Material *GenerateMaterial(Renderer &renderer,
 
   Material *material = new Material();
 
-  Texture albedoTexture;
-  LoadCgltfImageAsTexture(renderer, albedoImage, baseDirectory,
-                          VK_FORMAT_R8G8B8A8_SRGB, albedoTexture);
+  Texture albedoTexture = LoadCgltfImageAsTexture(
+      renderer, albedoImage, baseDirectory, VK_FORMAT_R8G8B8A8_SRGB);
 
-  Texture metallicTexture;
-  LoadCgltfImageAsTexture(renderer, metallicImage, baseDirectory,
-                          VK_FORMAT_R8G8B8A8_UNORM, metallicTexture);
+  Texture metallicTexture = LoadCgltfImageAsTexture(
+      renderer, metallicImage, baseDirectory, VK_FORMAT_R8G8B8A8_UNORM);
 
-  Texture normalTexture;
-  LoadCgltfImageAsTexture(renderer, normalImage, baseDirectory,
-                          VK_FORMAT_R8G8B8A8_UNORM, normalTexture);
+  Texture normalTexture = LoadCgltfImageAsTexture(
+      renderer, normalImage, baseDirectory, VK_FORMAT_R8G8B8A8_UNORM);
 
-  material->init(albedoTexture, metallicTexture, normalTexture);
+  VkDescriptorSet materialDescriptorSet =
+      CreateMaterialDescriptorSet(renderer, materialSetLayout, albedoTexture,
+                                  metallicTexture, normalTexture);
+
+  material->init(materialDescriptorSet, albedoTexture, metallicTexture,
+                 normalTexture);
 
   return material;
 }
@@ -270,7 +343,8 @@ static bool ExtractPrimitiveCPU(const cgltf_primitive &prim,
 }
 
 Model loadModel(Renderer &renderer, VertexDescriptor vertexDescriptor,
-                const char *filePath, const char *baseDirectory) {
+                VkDescriptorSetLayout descriptorSetLayout, const char *filePath,
+                const char *baseDirectory) {
   Builder builder = Builder(vertexDescriptor);
 
   cgltf_options options{};
@@ -297,34 +371,30 @@ Model loadModel(Renderer &renderer, VertexDescriptor vertexDescriptor,
     std::abort();
   }
 
-  // TextureCache texCache;
-
   for (cgltf_size mi = 0; mi < data->meshes_count; mi++) {
     const cgltf_mesh &mesh = data->meshes[mi];
 
     for (cgltf_size pi = 0; pi < mesh.primitives_count; pi++) {
-      const cgltf_primitive &prim = mesh.primitives[pi];
+      const cgltf_primitive &primitive = mesh.primitives[pi];
 
       std::vector<Vertex> vertices;
       std::vector<uint32_t> indices;
 
-      if (!ExtractPrimitiveCPU(prim, vertices, indices)) {
-        std::cout << "Skipping non-triangle or malformed." << std::endl;
+      if (!ExtractPrimitiveCPU(primitive, vertices, indices)) {
         continue;
       }
 
       builder.addVertices(vertices);
       builder.addIndices(indices);
 
-      Material *material = GenerateMaterial(renderer, prim.material, filePath);
+      Material *material = GenerateMaterial(renderer, descriptorSetLayout,
+                                            primitive.material, baseDirectory);
 
       builder.addMaterial(material);
 
       builder.generateMesh(renderer);
     }
   }
-
-  // cgltf_free(data);
 
   return builder.buildModel(renderer);
 }

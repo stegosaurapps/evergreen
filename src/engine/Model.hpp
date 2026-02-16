@@ -2,6 +2,8 @@
 
 #include "Mesh.hpp"
 
+#include <vulkan/vulkan.h>
+
 #include <vector>
 
 class Renderer; // forward declaration

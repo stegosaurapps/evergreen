@@ -12,12 +12,16 @@ public:
   Material() = default;
   ~Material() = default;
 
-  void init(Texture albedoTexture, Texture metallicRoughnessTexture,
-            Texture normalTexture);
+  void init(VkDescriptorSet descriptorSet, Texture albedoTexture,
+            Texture metallicRoughnessTexture, Texture normalTexture);
+
+  VkDescriptorSet *descriptorSet();
 
   void clear();
 
 private:
+  VkDescriptorSet m_descriptorSet = VK_NULL_HANDLE;
+
   std::unique_ptr<Texture> m_albedoTexture = nullptr;
   std::unique_ptr<Texture> m_metallicRoughnessTexture = nullptr;
   std::unique_ptr<Texture> m_normalTexture = nullptr;
