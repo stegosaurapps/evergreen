@@ -81,8 +81,6 @@ inline void PrintVertex(Vertex *vertex) {
             << vertex->tz << ", " << vertex->tw << ")" << std::endl;
   std::cout << "  Texture Coordinate: (" << vertex->ux << ", " << vertex->uy
             << ")" << std::endl;
-  // std::cout << "  Color: (" << vertex->r << ", " << vertex->g << ", "
-  //           << vertex->b << ")" << std::endl;
   std::cout << "--------------------" << std::endl;
 }
 

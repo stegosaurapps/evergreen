@@ -8,6 +8,8 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 
+#include "engine/Texture.hpp"
+
 #include <SDL3/SDL.h>
 
 #include <vulkan/vulkan.h>
@@ -330,4 +332,196 @@ static VkShaderModule CreateShaderModule(VkDevice device,
   }
 
   return shaderModule;
+}
+
+static VkCommandBuffer BeginOneShot(VkDevice device,
+                                    VkCommandPool commandPool) {
+  VkCommandBufferAllocateInfo commandBufferAllocateInfo{
+      VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+  commandBufferAllocateInfo.commandPool = commandPool;
+  commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  commandBufferAllocateInfo.commandBufferCount = 1;
+
+  VkCommandBuffer command = VK_NULL_HANDLE;
+  vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, &command);
+
+  VkCommandBufferBeginInfo commandBufferBeginInfo{
+      VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+  commandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+  vkBeginCommandBuffer(command, &commandBufferBeginInfo);
+
+  return command;
+}
+
+static void EndOneShot(VkDevice device, VkCommandPool commandPool,
+                       VkQueue queue, VkCommandBuffer command) {
+  vkEndCommandBuffer(command);
+
+  VkSubmitInfo submitInfo{VK_STRUCTURE_TYPE_SUBMIT_INFO};
+  submitInfo.commandBufferCount = 1;
+  submitInfo.pCommandBuffers = &command;
+  vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
+  vkQueueWaitIdle(queue);
+
+  vkFreeCommandBuffers(device, commandPool, 1, &command);
+}
+
+static void TransitionImage2D(VkCommandBuffer command, VkImage image,
+                              VkImageLayout oldLayout,
+                              VkImageLayout newLayout) {
+  VkImageMemoryBarrier imageMemoryBarrier{
+      VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+  imageMemoryBarrier.oldLayout = oldLayout;
+  imageMemoryBarrier.newLayout = newLayout;
+  imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  imageMemoryBarrier.image = image;
+  imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  imageMemoryBarrier.subresourceRange.baseMipLevel = 0;
+  imageMemoryBarrier.subresourceRange.levelCount = 1;
+  imageMemoryBarrier.subresourceRange.baseArrayLayer = 0;
+  imageMemoryBarrier.subresourceRange.layerCount = 1;
+
+  VkPipelineStageFlags srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+  VkPipelineStageFlags dstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+
+  if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
+      newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+    imageMemoryBarrier.srcAccessMask = 0;
+    imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+    dstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+  } else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
+             newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+    imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+  } else {
+    std::cerr << "Unsupported layout transition" << std::endl;
+    std::abort();
+  }
+
+  vkCmdPipelineBarrier(command, srcStage, dstStage, 0, 0, nullptr, 0, nullptr,
+                       1, &imageMemoryBarrier);
+}
+
+static void CopyBufferToImage2D(VkCommandBuffer cmd, VkBuffer buffer,
+                                VkImage image, uint32_t width,
+                                uint32_t height) {
+  VkBufferImageCopy bufferImageCopy{};
+  bufferImageCopy.bufferOffset = 0;
+  bufferImageCopy.bufferRowLength = 0;
+  bufferImageCopy.bufferImageHeight = 0;
+
+  bufferImageCopy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  bufferImageCopy.imageSubresource.mipLevel = 0;
+  bufferImageCopy.imageSubresource.baseArrayLayer = 0;
+  bufferImageCopy.imageSubresource.layerCount = 1;
+
+  bufferImageCopy.imageOffset = {0, 0, 0};
+  bufferImageCopy.imageExtent = {width, height, 1};
+
+  vkCmdCopyBufferToImage(cmd, buffer, image,
+                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
+                         &bufferImageCopy);
+}
+
+static VkSampler CreateSampler2D(VkDevice device) {
+  VkSamplerCreateInfo samplerCreateInfo{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
+  samplerCreateInfo.magFilter = VK_FILTER_LINEAR;
+  samplerCreateInfo.minFilter = VK_FILTER_LINEAR;
+  samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+  samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+  samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+  samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+  samplerCreateInfo.maxLod = 0.0f; // no mips
+  samplerCreateInfo.anisotropyEnable = VK_FALSE;
+
+  VkSampler sampler = VK_NULL_HANDLE;
+  if (vkCreateSampler(device, &samplerCreateInfo, nullptr, &sampler) !=
+      VK_SUCCESS) {
+    return VK_NULL_HANDLE;
+  }
+  return sampler;
+}
+
+static bool
+CreateTextureFromRGBA8(VkPhysicalDevice physicalDevice, VkDevice device,
+                       VkCommandPool commandPool, VkQueue graphicsQueue,
+                       const uint8_t *rgbaPixels, uint32_t width,
+                       uint32_t height,
+                       VkFormat format, // VK_FORMAT_R8G8B8A8_UNORM or _SRGB
+                       Texture &outTex) {
+  if (!rgbaPixels || width == 0 || height == 0)
+    return false;
+
+  const VkDeviceSize uploadSize =
+      (VkDeviceSize)width * (VkDeviceSize)height * 4;
+
+  // 1) staging buffer
+  VkBuffer stagingBuffer = VK_NULL_HANDLE;
+  VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
+  if (!CreateBuffer(physicalDevice, device, uploadSize,
+                    VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                    stagingBuffer, stagingMemory)) {
+    return false;
+  }
+
+  void *mapped = nullptr;
+  vkMapMemory(device, stagingMemory, 0, uploadSize, 0, &mapped);
+  memcpy(mapped, rgbaPixels, (size_t)uploadSize);
+  vkUnmapMemory(device, stagingMemory);
+
+  // 2) gpu image
+  VkImage image = VK_NULL_HANDLE;
+  VkDeviceMemory imageMemory = VK_NULL_HANDLE;
+  if (!CreateImage2D(
+          physicalDevice, device, VK_SAMPLE_COUNT_1_BIT, width, height, format,
+          VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, image,
+          imageMemory)) {
+    vkDestroyBuffer(device, stagingBuffer, nullptr);
+    vkFreeMemory(device, stagingMemory, nullptr);
+
+    return false;
+  }
+
+  // 3) copy + transitions
+  VkCommandBuffer cmd = BeginOneShot(device, commandPool);
+
+  TransitionImage2D(cmd, image, VK_IMAGE_LAYOUT_UNDEFINED,
+                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+  CopyBufferToImage2D(cmd, stagingBuffer, image, width, height);
+
+  TransitionImage2D(cmd, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+  EndOneShot(device, commandPool, graphicsQueue, cmd);
+
+  // 4) view + sampler
+  VkImageView view =
+      CreateImageView(device, image, format, VK_IMAGE_ASPECT_COLOR_BIT);
+  VkSampler sampler = CreateSampler2D(device);
+
+  // cleanup staging
+  vkDestroyBuffer(device, stagingBuffer, nullptr);
+  vkFreeMemory(device, stagingMemory, nullptr);
+
+  if (view == VK_NULL_HANDLE || sampler == VK_NULL_HANDLE) {
+    if (sampler)
+      vkDestroySampler(device, sampler, nullptr);
+    if (view)
+      vkDestroyImageView(device, view, nullptr);
+    vkDestroyImage(device, image, nullptr);
+    vkFreeMemory(device, imageMemory, nullptr);
+
+    return false;
+  }
+
+  outTex.init(width, height, 1, format, image, imageMemory, view, sampler);
+
+  return true;
 }

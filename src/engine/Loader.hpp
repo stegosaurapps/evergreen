@@ -10,30 +10,85 @@
 
 #include <cgltf/cgltf.h>
 
+#include <nothings/stb_image.h>
+
 #include <cstdint>
 #include <cstring>
 #include <iostream>
 #include <vector>
 
-static const cgltf_image *
-GetImageFromTexView(const cgltf_texture_view &rawTextureView) {
-  if (!rawTextureView.texture || !rawTextureView.texture->image) {
-    std::cout << "texture or texture image not available" << std::endl;
+static bool ReadAllBytes(const char *path, std::vector<uint8_t> &out) {
+  std::ifstream f(path, std::ios::binary | std::ios::ate);
+  if (!f)
+    return false;
+  size_t size = (size_t)f.tellg();
+  f.seekg(0);
+  out.resize(size);
+  f.read((char *)out.data(), size);
+  return true;
+}
 
-    return nullptr;
-  } else {
-    std::cout << "rawTextureView.texture->name: "
-              << rawTextureView.texture->name << std::endl;
+static bool GetImageBytesFromCgltf(const cgltf_image *img,
+                                   const char *baseDirectory,
+                                   std::vector<uint8_t> &outBytes) {
+  outBytes.clear();
+  if (!img)
+    return false;
 
-    // std::cout << "!rawTextureView.texture: " << !rawTextureView.texture
-    //           << std::endl;
-    // std::cout << "!rawTextureView.texture->image: "
-    //           << !rawTextureView.texture->image << std::endl;
-    // std::cout << "raw texture is not available, or raw texture image is not "
-    //              "available..."
-    //           << std::endl;
+  // URI path
+  if (img->uri && img->uri[0] != '\0') {
+    std::string full = std::string(baseDirectory) + std::string(img->uri);
+    return ReadAllBytes(full.c_str(), outBytes);
   }
 
+  // Embedded (buffer_view)
+  if (img->buffer_view && img->buffer_view->buffer &&
+      img->buffer_view->buffer->data) {
+    const cgltf_buffer_view *bv = img->buffer_view;
+    const uint8_t *base = (const uint8_t *)bv->buffer->data;
+    outBytes.resize((size_t)bv->size);
+    memcpy(outBytes.data(), base + (size_t)bv->offset, (size_t)bv->size);
+    return true;
+  }
+
+  return false;
+}
+
+static bool DecodeToRGBA8(const std::vector<uint8_t> &bytes,
+                          std::vector<uint8_t> &outPixels, int &outW,
+                          int &outH) {
+  int comp = 0;
+  stbi_uc *px = stbi_load_from_memory(bytes.data(), (int)bytes.size(), &outW,
+                                      &outH, &comp, 4);
+  if (!px)
+    return false;
+
+  outPixels.assign(px, px + (size_t)outW * (size_t)outH * 4);
+  stbi_image_free(px);
+  return true;
+}
+
+static bool LoadCgltfImageAsTexture(Renderer &renderer, const cgltf_image *img,
+                                    const char *baseDirectory,
+                                    VkFormat format, // SRGB or UNORM
+                                    Texture &outTex) {
+  std::vector<uint8_t> fileBytes;
+  if (!GetImageBytesFromCgltf(img, baseDirectory, fileBytes))
+    return false;
+
+  std::vector<uint8_t> rgba;
+  int w = 0, h = 0;
+  if (!DecodeToRGBA8(fileBytes, rgba, w, h))
+    return false;
+
+  return CreateTextureFromRGBA8(renderer.physicalDevice(), renderer.device(),
+                                renderer.commandPool(), renderer.grapicsQueue(),
+                                rgba.data(), (uint32_t)w, (uint32_t)h, format,
+                                outTex);
+}
+
+static const cgltf_image *
+GetImageFromTexView(const cgltf_texture_view &rawTextureView) {
   return rawTextureView.texture->image;
 }
 
@@ -42,6 +97,8 @@ static Material *GenerateMaterial(Renderer &renderer,
                                   const cgltf_material *rawMaterial,
                                   const char *baseDirectory) {
   if (!rawMaterial) {
+    std::cout << "!rawMaterial" << std::endl;
+
     return nullptr;
   }
 
@@ -49,45 +106,42 @@ static Material *GenerateMaterial(Renderer &renderer,
 
   // Albedo (sRGB)
   if (rawMaterial->has_pbr_metallic_roughness) {
-    const cgltf_image *albedoImg = GetImageFromTexView(
+    std::cout << "if (rawMaterial->has_pbr_metallic_roughness)" << std::endl;
+
+    const cgltf_image *albedoImgage = GetImageFromTexView(
         rawMaterial->pbr_metallic_roughness.base_color_texture);
 
-    // out->albedo = LoadGpuTextureFromCgltfImage(
-    //     renderer, cache, albedoImg, base_dir,
-    //     VK_FORMAT_R8G8B8A8_SRGB, /*genMips=*/true);
+    if (albedoImgage == nullptr) {
+      std::cout << "Albedo texture not found..." << std::endl;
+    } else {
+      std::cout << "We got an albedo texture!!!" << std::endl;
+    }
+
+    const cgltf_image *metallicImage = GetImageFromTexView(
+        rawMaterial->pbr_metallic_roughness.metallic_roughness_texture);
+
+    if (metallicImage == nullptr) {
+      std::cout << "Metallic texture not found..." << std::endl;
+    } else {
+      std::cout << "We got an Metallic texture!!!" << std::endl;
+    }
   }
 
   // Normal (linear UNORM)
-  {
-    const cgltf_image *normalImg =
-        GetImageFromTexView(rawMaterial->normal_texture);
+  const cgltf_image *normalImage =
+      GetImageFromTexView(rawMaterial->normal_texture);
 
-    // out->normal = LoadGpuTextureFromCgltfImage(
-    //     renderer, cache, normalImg, base_dir,
-    //     VK_FORMAT_R8G8B8A8_UNORM, true);
+  if (normalImage == nullptr) {
+    std::cout << "Noraml texture not found..." << std::endl;
+  } else {
+    std::cout << "We got an Normal texture!!!" << std::endl;
   }
 
-  // // Metallic + Roughness: glTF usually packs them into ONE texture
-  // std::shared_ptr<GpuTexture> mrPacked;
-  // if (rawMaterial->has_pbr_metallic_roughness) {
-  //   const cgltf_image* mrImg =
-  //       GetImageFromTexView(mat->pbr_metallic_roughness.metallic_roughness_texture);
+  Material *material = new Material();
 
-  //   mrPacked = LoadGpuTextureFromCgltfImage(
-  //       renderer, cache, mrImg, base_dir,
-  //       VK_FORMAT_R8G8B8A8_UNORM, true);
-  // }
+  // material->init();
 
-  // // Your slots:
-  // out->roughness = mrPacked; // alias
-  // out->metallic  = mrPacked; // alias
-
-  // // If you truly have separate metallic/roughness textures (nonstandard),
-  // // you can override out->roughness / out->metallic here when you detect
-  // them.
-
-  // if (!out->albedo && !out->normal && !out->roughness && !out->metallic)
-  // return nullptr; return out;
+  return material;
 }
 
 // Find an attribute accessor on a primitive (e.g. POSITION, NORMAL, TEXCOORD_0)
@@ -263,7 +317,7 @@ Model loadModel(Renderer &renderer, VertexDescriptor vertexDescriptor,
         continue;
       }
 
-      // auto materialTex = GenerateMaterial(renderer, prim.material, filePath);
+      auto materialTex = GenerateMaterial(renderer, prim.material, filePath);
 
       builder.addVertices(vertices);
       builder.addIndices(indices);

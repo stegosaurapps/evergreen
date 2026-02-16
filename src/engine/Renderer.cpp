@@ -65,6 +65,10 @@ VkSampleCountFlagBits Renderer::sampleCount() { return m_sampleCount; }
 
 VkRenderPass Renderer::renderPass() { return m_renderPass; }
 
+VkCommandPool Renderer::commandPool() { return m_commandPool; };
+
+VkQueue Renderer::grapicsQueue() { return m_graphicsQueue; }
+
 void Renderer::resize(int width, int height) {
   m_width = width;
   m_height = height;
@@ -165,9 +169,9 @@ void Renderer::shutdown() {
     m_inFlight[i] = VK_NULL_HANDLE;
   }
 
-  if (m_cmdPool) {
-    vkDestroyCommandPool(m_device, m_cmdPool, nullptr);
-    m_cmdPool = VK_NULL_HANDLE;
+  if (m_commandPool) {
+    vkDestroyCommandPool(m_device, m_commandPool, nullptr);
+    m_commandPool = VK_NULL_HANDLE;
   }
 
   destroySwapchain();
@@ -809,7 +813,7 @@ void Renderer::createCommandPool() {
   commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
   VkResult result = vkCreateCommandPool(m_device, &commandPoolCreateInfo,
-                                        nullptr, &m_cmdPool);
+                                        nullptr, &m_commandPool);
   if (result != VK_SUCCESS) {
     std::cerr << "vkCreateCommandPool failed: " << (int)result << std::endl;
     std::abort();
@@ -820,7 +824,7 @@ void Renderer::createCommandBuffers() {
   VkCommandBufferAllocateInfo commandBufferAllocateInfo{};
   commandBufferAllocateInfo.sType =
       VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  commandBufferAllocateInfo.commandPool = m_cmdPool;
+  commandBufferAllocateInfo.commandPool = m_commandPool;
   commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
   commandBufferAllocateInfo.commandBufferCount = FRAME_COUNT;
 

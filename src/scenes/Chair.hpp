@@ -176,9 +176,6 @@ void createPipeline(Renderer &renderer, Scene *scene) {
   for (int i = 0; i < vertexAttributes.size(); i++) {
     auto vertexAttribute = vertexAttributes[i];
 
-    std::cout << "Adding vertex attribute: " << AttributeName(vertexAttribute)
-              << " with offset: " << offset << std::endl;
-
     uint32_t attributeSize = sizeof(float) * AttributeCount(vertexAttribute);
 
     VkVertexInputAttributeDescription vertexInputAttributeDescription;

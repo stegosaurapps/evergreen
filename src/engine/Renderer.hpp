@@ -29,6 +29,8 @@ public:
   VkDevice device();
   VkSampleCountFlagBits sampleCount();
   VkRenderPass renderPass();
+  VkCommandPool commandPool();
+  VkQueue grapicsQueue();
 
   void resize(int width, int height);
   void update(float deltaTime);
@@ -80,7 +82,7 @@ private:
   VkRenderPass m_renderPass = VK_NULL_HANDLE;
   std::vector<VkFramebuffer> m_framebuffers;
 
-  VkCommandPool m_cmdPool = VK_NULL_HANDLE;
+  VkCommandPool m_commandPool = VK_NULL_HANDLE;
 
   int m_frameIndex = 0;
   std::array<VkCommandBuffer, FRAME_COUNT> m_cmd{};
