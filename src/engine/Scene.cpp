@@ -6,10 +6,15 @@
 #include <iostream>
 
 void Scene::init(Renderer &renderer, Camera camera, std::vector<Model> models,
+                 Sky *sky,
                  std::function<void(Renderer &, Scene *)> createPipeline,
                  std::function<void(Renderer &, Scene *)> destroyPipeline) {
   m_camera = camera;
+
   m_models = models;
+
+  m_sky = sky;
+
   m_createPipeline = createPipeline;
   m_destroyPipeline = destroyPipeline;
 

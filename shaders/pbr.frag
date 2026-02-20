@@ -10,6 +10,10 @@ layout(set = 1, binding = 0) uniform sampler2D uAlbedo;
 layout(set = 1, binding = 1) uniform sampler2D uMetalRough; // G=roughness, B=metallic (glTF)
 layout(set = 1, binding = 2) uniform sampler2D uNormal;
 
+layout(set = 2, binding = 0) uniform sampler2D   uBrdfLut;
+layout(set = 2, binding = 1) uniform samplerCube uIrradiance;
+layout(set = 2, binding = 2) uniform samplerCube uPrefiltered;
+
 void main() {
   // vec3 testColor = vec3(0.0, 1.0, 0.0);
 

@@ -4,6 +4,7 @@
 #include "Constants.hpp"
 #include "Mesh.hpp"
 #include "Model.hpp"
+#include "Sky.hpp"
 #include "Transform.hpp"
 #include "Vertex.hpp"
 
@@ -22,7 +23,7 @@ public:
   ~Scene() = default;
 
   void init(Renderer &renderer, Camera camera, std::vector<Model> models,
-            std::function<void(Renderer &, Scene *)> createPipeline,
+            Sky *sky, std::function<void(Renderer &, Scene *)> createPipeline,
             std::function<void(Renderer &, Scene *)> destroyPipeline);
   void update(Renderer &renderer, float deltaTime);
   void draw(Renderer &renderer);
@@ -51,7 +52,12 @@ public:
 
 private:
   Camera m_camera;
+
+  // List of renderables
   std::vector<Model> m_models;
+
+  // Optional global lighting
+  Sky *m_sky;
 
   // Pipeline
   VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;

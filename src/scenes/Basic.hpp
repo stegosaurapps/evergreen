@@ -405,7 +405,10 @@ Scene LoadScene(Renderer &renderer) {
   // Finally create model.
   auto models = createModels(renderer);
 
-  scene.init(renderer, camera, models, createPipeline, destroyPipeline);
+  // Empty sky.
+  Sky *sky = nullptr;
+
+  scene.init(renderer, camera, models, sky, createPipeline, destroyPipeline);
 
   return scene;
 }
