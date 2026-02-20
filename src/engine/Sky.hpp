@@ -13,16 +13,15 @@ class Renderer; // forward declaration
 
 class Sky {
 public:
-  Sky(Texture brdfLut, Texture diffuseIrradiance, Texture specularIrradiance);
+  Sky(VkDescriptorPool skyDescriptorPool,
+      VkDescriptorSetLayout skyDescriptorSetLayout,
+      VkDescriptorSet skyDescriptorSet, Texture brdfLut,
+      Texture diffuseIrradiance, Texture specularIrradiance);
   ~Sky() = default;
-
-  void init(VkDescriptorPool skyDescriptorPool,
-            VkDescriptorSetLayout skyDescriptorSetLayout,
-            std::array<VkDescriptorSet, FRAME_COUNT> skyDescriptorSets);
 
   VkDescriptorPool *skyDescriptorPool();
   VkDescriptorSetLayout *skyDescriptorSetLayout();
-  std::array<VkDescriptorSet, FRAME_COUNT> *skyDescriptorSets();
+  VkDescriptorSet *skyDescriptorSet();
 
   Texture &brdfLut();
   Texture &diffuseIrradiance();
@@ -32,7 +31,7 @@ private:
   // Frame Descriptor
   VkDescriptorPool m_skyDescriptorPool = VK_NULL_HANDLE;
   VkDescriptorSetLayout m_skyDescriptorSetLayout = VK_NULL_HANDLE;
-  std::array<VkDescriptorSet, FRAME_COUNT> m_skyDescriptorSets{};
+  VkDescriptorSet m_skyDescriptorSet;
 
   Texture m_brdfLut;            // 2D
   Texture m_diffuseIrradiance;  // cube (1 mip)

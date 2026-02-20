@@ -4,33 +4,17 @@
 #define CGLTF_IMPLEMENTATION
 #endif
 
-#ifndef STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_IMPLEMENTATION
-#endif
-
 #include "Builder.hpp"
+#include "Image.hpp"
 #include "Renderer.hpp"
 #include "Vertex.hpp"
 
 #include <cgltf/cgltf.h>
 
-#include <nothings/stb_image.h>
-
 #include <cstdint>
 #include <cstring>
 #include <iostream>
 #include <vector>
-
-static bool ReadAllBytes(const char *path, std::vector<uint8_t> &out) {
-  std::ifstream f(path, std::ios::binary | std::ios::ate);
-  if (!f)
-    return false;
-  size_t size = (size_t)f.tellg();
-  f.seekg(0);
-  out.resize(size);
-  f.read((char *)out.data(), size);
-  return true;
-}
 
 static bool GetImageBytesFromCgltf(const cgltf_image *image,
                                    const char *baseDirectory,
@@ -47,20 +31,6 @@ static bool GetImageBytesFromCgltf(const cgltf_image *image,
   }
 
   return false;
-}
-
-static bool DecodeToRGBA8(const std::vector<uint8_t> &bytes,
-                          std::vector<uint8_t> &outPixels, int &outW,
-                          int &outH) {
-  int comp = 0;
-  stbi_uc *px = stbi_load_from_memory(bytes.data(), (int)bytes.size(), &outW,
-                                      &outH, &comp, 4);
-  if (!px)
-    return false;
-
-  outPixels.assign(px, px + (size_t)outW * (size_t)outH * 4);
-  stbi_image_free(px);
-  return true;
 }
 
 static Texture LoadCgltfImageAsTexture(Renderer &renderer,
