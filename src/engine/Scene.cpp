@@ -77,6 +77,8 @@ std::array<VkDeviceMemory, FRAME_COUNT> *Scene::uboMemoryList() {
   return &m_uboMemoryList;
 }
 
+Sky *Scene::sky() { return m_sky; }
+
 std::array<void *, FRAME_COUNT> *Scene::uboMappedList() {
   return &m_uboMappedList;
 }

@@ -48,6 +48,8 @@ public:
   std::array<VkDeviceMemory, FRAME_COUNT> *uboMemoryList();
   std::array<void *, FRAME_COUNT> *uboMappedList();
 
+  Sky *sky();
+
   void shutdown(Renderer &renderer);
 
 private:

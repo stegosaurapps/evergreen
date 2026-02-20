@@ -779,7 +779,7 @@ Sky *createSky(Renderer &renderer) {
       new Sky(skyDescriptorPool, skyDescriptorSetLayout, skyDescriptorSet,
               brdfLutTexture, diffuseIrradiance, specularIrradiance);
 
-  return nullptr;
+  return sky;
 }
 
 Scene LoadScene(Renderer &renderer) {

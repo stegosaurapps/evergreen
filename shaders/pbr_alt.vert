@@ -25,8 +25,8 @@ void main() {
   gl_Position = ubo.viewProj * worldPos;
 
   vNormal = inNormal;
-    
   vTangent = inTangent;
-
   vUV = inUV;
+
+  // vColor = inColor;
 }

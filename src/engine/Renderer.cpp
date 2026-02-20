@@ -967,6 +967,8 @@ void Renderer::recordCommandBuffer(VkCommandBuffer commandBuffer,
   vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
   vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+
+  // Bind frame descriptor set
   vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                           pipelineLayout, 0, 1,
                           &frameDescriptorSets[m_frameIndex], 0, nullptr);
@@ -974,6 +976,13 @@ void Renderer::recordCommandBuffer(VkCommandBuffer commandBuffer,
   Mat4 model = Mat4::identity(); // MUST be initialized
   vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
                      0, sizeof(Mat4), &model);
+
+  if (scene->sky() != nullptr) {
+    // Bind IBL descriptor set
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            pipelineLayout, 2, 1,
+                            scene->sky()->skyDescriptorSet(), 0, nullptr);
+  }
 
   VkDeviceSize off = 0;
 
