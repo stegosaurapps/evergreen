@@ -40,9 +40,9 @@ public:
   VkPipelineLayout *pipelineLayout();
   VkPipeline *pipeline();
 
-  VkDescriptorSetLayout *descriptorSetLayout();
-  VkDescriptorPool *descriptorPool();
-  std::array<VkDescriptorSet, FRAME_COUNT> *descriptorSets();
+  VkDescriptorPool *frameDescriptorPool();
+  VkDescriptorSetLayout *frameDescriptorSetLayout();
+  std::array<VkDescriptorSet, FRAME_COUNT> *frameDescriptorSets();
 
   std::array<VkBuffer, FRAME_COUNT> *uboBufferList();
   std::array<VkDeviceMemory, FRAME_COUNT> *uboMemoryList();
@@ -63,10 +63,10 @@ private:
   VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
   VkPipeline m_pipeline = VK_NULL_HANDLE;
 
-  // Descriptors (set 0 = per-frame camera)
-  VkDescriptorSetLayout m_descriptorSetLayout = VK_NULL_HANDLE;
-  VkDescriptorPool m_descriptorPool = VK_NULL_HANDLE;
-  std::array<VkDescriptorSet, FRAME_COUNT> m_DescriptorSets{};
+  // Frame Descriptor
+  VkDescriptorPool m_frameDescriptorPool = VK_NULL_HANDLE;
+  VkDescriptorSetLayout m_frameDescriptorSetLayout = VK_NULL_HANDLE;
+  std::array<VkDescriptorSet, FRAME_COUNT> m_frameDescriptorSets{};
 
   // Uniform buffers (one per frame-in-flight)
   std::array<VkBuffer, FRAME_COUNT> m_uboBufferList{};

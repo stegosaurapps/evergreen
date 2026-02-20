@@ -905,7 +905,7 @@ void Renderer::recordCommandBuffer(VkCommandBuffer commandBuffer,
 
   auto pipelineLayout = *scene->pipelineLayout();
   auto pipeline = *scene->pipeline();
-  auto descriptorSets = *scene->descriptorSets();
+  auto frameDescriptorSets = *scene->frameDescriptorSets();
 
   VkCommandBufferBeginInfo commandBufferBeginInfo{};
   commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -922,7 +922,7 @@ void Renderer::recordCommandBuffer(VkCommandBuffer commandBuffer,
   if (m_sampleCount == VK_SAMPLE_COUNT_1_BIT) {
     VkClearValue clears[2]{};
 
-    // A pleasant “evergreen-ish” clear.
+    // Clear color.
     clears[0].color.float32[0] = m_clearColor[0];
     clears[0].color.float32[1] = m_clearColor[1];
     clears[0].color.float32[2] = m_clearColor[2];
@@ -936,7 +936,7 @@ void Renderer::recordCommandBuffer(VkCommandBuffer commandBuffer,
   } else {
     VkClearValue clears[3]{};
 
-    // A pleasant “evergreen-ish” clear.
+    // Clear color.
     clears[0].color.float32[0] = m_clearColor[0];
     clears[0].color.float32[1] = m_clearColor[1];
     clears[0].color.float32[2] = m_clearColor[2];
@@ -968,8 +968,8 @@ void Renderer::recordCommandBuffer(VkCommandBuffer commandBuffer,
 
   vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
   vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                          pipelineLayout, 0, 1, &descriptorSets[m_frameIndex],
-                          0, nullptr);
+                          pipelineLayout, 0, 1,
+                          &frameDescriptorSets[m_frameIndex], 0, nullptr);
 
   Mat4 model = Mat4::identity(); // MUST be initialized
   vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,

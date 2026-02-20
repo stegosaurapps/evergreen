@@ -57,14 +57,16 @@ VkPipelineLayout *Scene::pipelineLayout() { return &m_pipelineLayout; }
 
 VkPipeline *Scene::pipeline() { return &m_pipeline; }
 
-VkDescriptorSetLayout *Scene::descriptorSetLayout() {
-  return &m_descriptorSetLayout;
+VkDescriptorSetLayout *Scene::frameDescriptorSetLayout() {
+  return &m_frameDescriptorSetLayout;
 }
 
-VkDescriptorPool *Scene::descriptorPool() { return &m_descriptorPool; };
+VkDescriptorPool *Scene::frameDescriptorPool() {
+  return &m_frameDescriptorPool;
+};
 
-std::array<VkDescriptorSet, FRAME_COUNT> *Scene::descriptorSets() {
-  return &m_DescriptorSets;
+std::array<VkDescriptorSet, FRAME_COUNT> *Scene::frameDescriptorSets() {
+  return &m_frameDescriptorSets;
 }
 
 std::array<VkBuffer, FRAME_COUNT> *Scene::uboBufferList() {

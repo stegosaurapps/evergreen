@@ -35,7 +35,37 @@ Camera createCamera(Dimensions dimensions) {
   return camera;
 }
 
-void createDescriptorSetLayout(Renderer &renderer, Scene *scene) {
+void createFrameDescriptorPool(Renderer &renderer, Scene *scene) {
+  auto device = renderer.device();
+
+  auto frameDescriptorSetLayout = scene->frameDescriptorSetLayout();
+  auto frameDescriptorPool = scene->frameDescriptorPool();
+  auto frameDescriptorSets = scene->frameDescriptorSets();
+
+  VkDescriptorPoolSize descriptorPoolSize{};
+  descriptorPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  descriptorPoolSize.descriptorCount = FRAME_COUNT;
+
+  VkDescriptorPoolCreateInfo descriptorPoolCreateInfo{
+      VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+  descriptorPoolCreateInfo.maxSets = FRAME_COUNT;
+  descriptorPoolCreateInfo.poolSizeCount = 1;
+  descriptorPoolCreateInfo.pPoolSizes = &descriptorPoolSize;
+
+  auto result = vkCreateDescriptorPool(device, &descriptorPoolCreateInfo,
+                                       nullptr, frameDescriptorPool);
+  if (result != VK_SUCCESS) {
+    std::cerr << "vkCreateDescriptorPool failed" << std::endl;
+    std::abort();
+  }
+
+  std::array<VkDescriptorSetLayout, FRAME_COUNT> descriptorSetLayouts;
+  for (int i = 0; i < FRAME_COUNT; ++i) {
+    descriptorSetLayouts[i] = *frameDescriptorSetLayout;
+  }
+}
+
+void createFrameDescriptorSetLayout(Renderer &renderer, Scene *scene) {
   auto device = renderer.device();
 
   VkDescriptorSetLayoutBinding descriptorSetLayoutBinding{};
@@ -52,56 +82,41 @@ void createDescriptorSetLayout(Renderer &renderer, Scene *scene) {
 
   auto result =
       vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo,
-                                  nullptr, scene->descriptorSetLayout());
+                                  nullptr, scene->frameDescriptorSetLayout());
   if (result != VK_SUCCESS) {
     std::cerr << "vkCreateDescriptorSetLayout failed" << std::endl;
     std::abort();
   }
 }
 
-void createDescriptorPool(Renderer &renderer, Scene *scene) {
-  auto device = renderer.device();
+void allocateFrameDescriptorSetLayout(Renderer &renderer, Scene *scene) {
+  VkDevice device = renderer.device();
 
-  auto descriptorSetLayout = scene->descriptorSetLayout();
-  auto descriptorPool = scene->descriptorPool();
-  auto descriptorSets = scene->descriptorSets();
+  VkDescriptorPool *pool = scene->frameDescriptorPool();
+  VkDescriptorSetLayout *frameLayout = scene->frameDescriptorSetLayout();
 
-  VkDescriptorPoolSize descriptorPoolSize{};
-  descriptorPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  descriptorPoolSize.descriptorCount = FRAME_COUNT;
+  auto *frameSets =
+      scene->frameDescriptorSets(); // std::array<VkDescriptorSet, FRAME_COUNT>
 
-  VkDescriptorPoolCreateInfo descriptorPoolCreateInfo{
-      VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
-  descriptorPoolCreateInfo.maxSets = FRAME_COUNT;
-  descriptorPoolCreateInfo.poolSizeCount = 1;
-  descriptorPoolCreateInfo.pPoolSizes = &descriptorPoolSize;
-
-  auto result = vkCreateDescriptorPool(device, &descriptorPoolCreateInfo,
-                                       nullptr, descriptorPool);
-  if (result != VK_SUCCESS) {
-    std::cerr << "vkCreateDescriptorPool failed" << std::endl;
-    std::abort();
+  // Allocate frame descriptor sets as before
+  std::array<VkDescriptorSetLayout, FRAME_COUNT> layouts;
+  for (uint32_t i = 0; i < FRAME_COUNT; ++i) {
+    layouts[i] = *frameLayout;
   }
 
-  std::array<VkDescriptorSetLayout, FRAME_COUNT> descriptorSetLayouts;
-  for (int i = 0; i < FRAME_COUNT; ++i) {
-    descriptorSetLayouts[i] = *descriptorSetLayout;
-  }
-
-  VkDescriptorSetAllocateInfo descriptorSetAllocateInfo{
+  VkDescriptorSetAllocateInfo ai{
       VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
-  descriptorSetAllocateInfo.descriptorPool = *descriptorPool;
-  descriptorSetAllocateInfo.descriptorSetCount = FRAME_COUNT;
-  descriptorSetAllocateInfo.pSetLayouts = descriptorSetLayouts.data();
+  ai.descriptorPool = *pool;
+  ai.descriptorSetCount = FRAME_COUNT;
+  ai.pSetLayouts = layouts.data();
 
-  if (vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo,
-                               descriptorSets->data()) != VK_SUCCESS) {
-    std::cerr << "vkAllocateDescriptorSets failed" << std::endl;
+  if (vkAllocateDescriptorSets(device, &ai, frameSets->data()) != VK_SUCCESS) {
+    std::cerr << "vkAllocateDescriptorSets (frame) failed\n";
     std::abort();
   }
 }
 
-VkDescriptorSetLayout createMaterialSetLayout(Renderer &renderer) {
+VkDescriptorSetLayout createMaterialDescriptorSetLayout(Renderer &renderer) {
   VkDevice device = renderer.device();
 
   VkDescriptorSetLayoutBinding bindings[3]{};
@@ -140,14 +155,55 @@ VkDescriptorSetLayout createMaterialSetLayout(Renderer &renderer) {
   return materialSetLayout;
 }
 
+VkDescriptorSetLayout CreateSkyDescriptorSetLayout(Renderer &renderer) {
+  VkDevice device = renderer.device();
+
+  VkDescriptorSetLayoutBinding bindings[3]{};
+
+  // binding 0: BRDF LUT (2D)
+  bindings[0].binding = 0;
+  bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  bindings[0].descriptorCount = 1;
+  bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+  // binding 1: diffuse irradiance cube
+  bindings[1].binding = 1;
+  bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  bindings[1].descriptorCount = 1;
+  bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+  // binding 2: specular prefiltered cube (mipped)
+  bindings[2].binding = 2;
+  bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  bindings[2].descriptorCount = 1;
+  bindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+  VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{
+      VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+  descriptorSetLayoutCreateInfo.bindingCount = 3;
+  descriptorSetLayoutCreateInfo.pBindings = bindings;
+
+  VkDescriptorSetLayout skyLayout = VK_NULL_HANDLE;
+  if (vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo,
+                                  nullptr, &skyLayout) != VK_SUCCESS) {
+    return VK_NULL_HANDLE;
+  }
+
+  return skyLayout;
+}
+
 void createPipeline(Renderer &renderer, Scene *scene) {
   VkDevice device = renderer.device();
 
   VkPipelineLayout *pipelineLayout = scene->pipelineLayout();
   VkPipeline *pipeline = scene->pipeline();
 
-  VkDescriptorSetLayout *frameSetLayout = scene->descriptorSetLayout();
-  VkDescriptorSetLayout materialSetLayout = createMaterialSetLayout(renderer);
+  VkDescriptorSetLayout *frameDescriptorSetLayout =
+      scene->frameDescriptorSetLayout();
+  VkDescriptorSetLayout materialDescriptorSetLayout =
+      createMaterialDescriptorSetLayout(renderer);
+  VkDescriptorSetLayout skyDescriptorSetLayout =
+      CreateSkyDescriptorSetLayout(renderer);
 
   auto vertexDescriptor = basicVertexDescriptor();
   PrintVertexDescriptor(&vertexDescriptor);
@@ -287,27 +343,39 @@ void createPipeline(Renderer &renderer, Scene *scene) {
   pushConstantsRange.offset = 0;
   pushConstantsRange.size = sizeof(Mat4);
 
-  if (!frameSetLayout || *frameSetLayout == VK_NULL_HANDLE) {
-    std::cerr << "createPipeline: frame descriptor set layout (set=0) is "
-                 "VK_NULL_HANDLE\n";
+  if (!frameDescriptorSetLayout ||
+      *frameDescriptorSetLayout == VK_NULL_HANDLE) {
+    std::cerr
+        << "createPipeline: frameDescriptorSetLayout set layout (set=0) is "
+           "VK_NULL_HANDLE\n";
     std::abort();
   }
 
-  // ---- Create material descriptor set layout (set=1) if missing ----
-  if (!materialSetLayout) {
-    std::cerr << "createPipeline: materialSetLayout pointer is null (Scene "
-                 "missing storage"
-              << std::endl;
+  if (!materialDescriptorSetLayout ||
+      materialDescriptorSetLayout == VK_NULL_HANDLE) {
+    std::cerr
+        << "createPipeline: materialDescriptorSetLayout pointer is null (Scene "
+           "missing storage"
+        << std::endl;
     std::abort();
   }
 
-  // ---- Pipeline layout: set 0 (frame) + set 1 (material) ----
-  VkDescriptorSetLayout descriptorSetLayout[2] = {*frameSetLayout,
-                                                  materialSetLayout};
+  if (!skyDescriptorSetLayout || skyDescriptorSetLayout == VK_NULL_HANDLE) {
+    std::cerr
+        << "createPipeline: skyDescriptorSetLayout pointer is null (Scene "
+           "missing storage"
+        << std::endl;
+    std::abort();
+  }
+
+  // ---- Pipeline layout: set 0 (frame) + set 1 (material) + set 2 (IBL) ----
+  VkDescriptorSetLayout descriptorSetLayout[3] = {*frameDescriptorSetLayout,
+                                                  materialDescriptorSetLayout,
+                                                  skyDescriptorSetLayout};
 
   VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{
       VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
-  pipelineLayoutCreateInfo.setLayoutCount = 2;
+  pipelineLayoutCreateInfo.setLayoutCount = 3;
   pipelineLayoutCreateInfo.pSetLayouts = descriptorSetLayout;
   pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
   pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantsRange;
@@ -366,7 +434,7 @@ void destroyPipeline(Renderer &renderer, Scene *scene) {
   auto pipelineLayout = scene->pipelineLayout();
   auto pipeline = scene->pipeline();
 
-  auto descriptorSetLayout = scene->descriptorSetLayout();
+  auto descriptorSetLayout = scene->frameDescriptorSetLayout();
 
   if (!device) {
     return;
@@ -391,7 +459,7 @@ void createUniformBuffers(Renderer &renderer, Scene *scene) {
   auto uboMemoryList = scene->uboMemoryList();
   auto uboMappedList = scene->uboMappedList();
 
-  auto descriptorSets = scene->descriptorSets();
+  auto descriptorSets = scene->frameDescriptorSets();
 
   for (int i = 0; i < FRAME_COUNT; ++i) {
     if (!CreateBuffer(renderer.physicalDevice(), device, sizeof(CameraUBO),
@@ -427,48 +495,14 @@ void createUniformBuffers(Renderer &renderer, Scene *scene) {
 }
 
 std::vector<Model> createModels(Renderer &renderer) {
-  auto model = loadModel(
-      renderer, basicVertexDescriptor(), createMaterialSetLayout(renderer),
-      "./assets/model/chair/chair.gltf", "./assets/model/chair/");
+  auto model =
+      loadModel(renderer, basicVertexDescriptor(),
+                createMaterialDescriptorSetLayout(renderer),
+                "./assets/model/chair/chair.gltf", "./assets/model/chair/");
 
   std::vector<Model> models = {model};
 
   return models;
-}
-
-VkDescriptorSetLayout CreateSkyDescriptorSetLayout(VkDevice device) {
-  VkDescriptorSetLayoutBinding bindings[3]{};
-
-  // binding 0: BRDF LUT (2D)
-  bindings[0].binding = 0;
-  bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-  bindings[0].descriptorCount = 1;
-  bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-  // binding 1: diffuse irradiance cube
-  bindings[1].binding = 1;
-  bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-  bindings[1].descriptorCount = 1;
-  bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-  // binding 2: specular prefiltered cube (mipped)
-  bindings[2].binding = 2;
-  bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-  bindings[2].descriptorCount = 1;
-  bindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-  VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{
-      VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
-  descriptorSetLayoutCreateInfo.bindingCount = 3;
-  descriptorSetLayoutCreateInfo.pBindings = bindings;
-
-  VkDescriptorSetLayout layout = VK_NULL_HANDLE;
-  if (vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo,
-                                  nullptr, &layout) != VK_SUCCESS) {
-    return VK_NULL_HANDLE;
-  }
-
-  return layout;
 }
 
 Sky *createSky(Renderer &renderer) { return nullptr; }
@@ -476,9 +510,10 @@ Sky *createSky(Renderer &renderer) { return nullptr; }
 Scene LoadScene(Renderer &renderer) {
   Scene scene;
 
-  // First create descriptors.
-  createDescriptorSetLayout(renderer, &scene);
-  createDescriptorPool(renderer, &scene);
+  // First create the scene frame descriptors.
+  createFrameDescriptorPool(renderer, &scene);
+  createFrameDescriptorSetLayout(renderer, &scene);
+  allocateFrameDescriptorSetLayout(renderer, &scene);
 
   // Next create uniform buffers.
   createUniformBuffers(renderer, &scene);
