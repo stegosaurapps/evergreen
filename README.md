@@ -84,6 +84,7 @@ It supports glTF asset loading, image-based lighting, and a descriptor-driven ma
 
 ## Example Output
 
+![Screenshot](output/evergreen-output.jpg)
 Bright outdoor HDR IBL with ACES tonemapping applied.
 
 ---
