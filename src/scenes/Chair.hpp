@@ -155,6 +155,38 @@ VkDescriptorSetLayout createMaterialDescriptorSetLayout(Renderer &renderer) {
   return materialSetLayout;
 }
 
+void createSkyDescriptorPool(Renderer &renderer,
+                             VkDescriptorPool *skyDescriptorPool) {
+  VkDevice device = renderer.device();
+
+  if (!skyDescriptorPool) {
+    std::cerr << "createSkyDescriptorPool: skyDescriptorPool is null"
+              << std::endl;
+    std::abort();
+  }
+
+  if (*skyDescriptorPool != VK_NULL_HANDLE) {
+    vkDestroyDescriptorPool(device, *skyDescriptorPool, nullptr);
+    *skyDescriptorPool = VK_NULL_HANDLE;
+  }
+
+  VkDescriptorPoolSize descriptorPoolSize{};
+  descriptorPoolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  descriptorPoolSize.descriptorCount = 3; // brdf + diffuse cube + spec cube
+
+  VkDescriptorPoolCreateInfo descriptorPoolCreateInfo{
+      VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+  descriptorPoolCreateInfo.maxSets = 1;
+  descriptorPoolCreateInfo.poolSizeCount = 1;
+  descriptorPoolCreateInfo.pPoolSizes = &descriptorPoolSize;
+
+  if (vkCreateDescriptorPool(device, &descriptorPoolCreateInfo, nullptr,
+                             skyDescriptorPool) != VK_SUCCESS) {
+    std::cerr << "createSkyDescriptorPool: vkCreateDescriptorPool failed\n";
+    std::abort();
+  }
+}
+
 VkDescriptorSetLayout CreateSkyDescriptorSetLayout(Renderer &renderer) {
   VkDevice device = renderer.device();
 
@@ -190,6 +222,102 @@ VkDescriptorSetLayout CreateSkyDescriptorSetLayout(Renderer &renderer) {
   }
 
   return skyLayout;
+}
+
+VkDescriptorSet CreateSkyDescriptorSet(Renderer &renderer,
+                                       VkDescriptorPool descriptorPool,
+                                       VkDescriptorSetLayout skySetLayout,
+                                       Texture &brdfLut,
+                                       Texture &diffuseIrradiance,
+                                       Texture &specularPrefiltered) {
+  VkDevice device = renderer.device();
+
+  if (descriptorPool == VK_NULL_HANDLE) {
+    std::cerr << "CreateSkyDescriptorSet: renderer.skyDescriptorPool() is "
+                 "VK_NULL_HANDLE"
+              << std::endl;
+    std::abort();
+  }
+  if (skySetLayout == VK_NULL_HANDLE) {
+    std::cerr << "CreateSkyDescriptorSet: skySetLayout is VK_NULL_HANDLE"
+              << std::endl;
+    std::abort();
+  }
+
+  VkDescriptorSetAllocateInfo descriptorSetAllocateInfo{
+      VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+  descriptorSetAllocateInfo.descriptorPool = descriptorPool;
+  descriptorSetAllocateInfo.descriptorSetCount = 1;
+  descriptorSetAllocateInfo.pSetLayouts = &skySetLayout;
+
+  VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
+  if (vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo,
+                               &descriptorSet) != VK_SUCCESS) {
+    std::cerr << "CreateSkyDescriptorSet: vkAllocateDescriptorSets failed"
+              << std::endl;
+    std::abort();
+  }
+
+  // Must be valid (no null view/sampler)
+  VkDescriptorImageInfo brdfInfo{};
+  brdfInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  brdfInfo.imageView = brdfLut.view();
+  brdfInfo.sampler = brdfLut.sampler();
+
+  VkDescriptorImageInfo diffuseInfo{};
+  diffuseInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  diffuseInfo.imageView = diffuseIrradiance.view();
+  diffuseInfo.sampler = diffuseIrradiance.sampler();
+
+  VkDescriptorImageInfo specInfo{};
+  specInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  specInfo.imageView = specularPrefiltered.view();
+  specInfo.sampler = specularPrefiltered.sampler();
+
+  if (brdfInfo.imageView == VK_NULL_HANDLE ||
+      brdfInfo.sampler == VK_NULL_HANDLE ||
+      diffuseInfo.imageView == VK_NULL_HANDLE ||
+      diffuseInfo.sampler == VK_NULL_HANDLE ||
+      specInfo.imageView == VK_NULL_HANDLE ||
+      specInfo.sampler == VK_NULL_HANDLE) {
+    std::cerr << "CreateSkyDescriptorSet: one or more sky textures have null "
+                 "view/sampler"
+              << std::endl;
+    std::abort();
+  }
+
+  VkWriteDescriptorSet writeDescriptorSet[3]{};
+
+  // binding 0: BRDF LUT (sampler2D)
+  writeDescriptorSet[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  writeDescriptorSet[0].dstSet = descriptorSet;
+  writeDescriptorSet[0].dstBinding = 0;
+  writeDescriptorSet[0].descriptorType =
+      VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  writeDescriptorSet[0].descriptorCount = 1;
+  writeDescriptorSet[0].pImageInfo = &brdfInfo;
+
+  // binding 1: diffuse irradiance cubemap (samplerCube)
+  writeDescriptorSet[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  writeDescriptorSet[1].dstSet = descriptorSet;
+  writeDescriptorSet[1].dstBinding = 1;
+  writeDescriptorSet[1].descriptorType =
+      VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  writeDescriptorSet[1].descriptorCount = 1;
+  writeDescriptorSet[1].pImageInfo = &diffuseInfo;
+
+  // binding 2: specular prefiltered cubemap (samplerCube, mipped)
+  writeDescriptorSet[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  writeDescriptorSet[2].dstSet = descriptorSet;
+  writeDescriptorSet[2].dstBinding = 2;
+  writeDescriptorSet[2].descriptorType =
+      VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  writeDescriptorSet[2].descriptorCount = 1;
+  writeDescriptorSet[2].pImageInfo = &specInfo;
+
+  vkUpdateDescriptorSets(device, 3, writeDescriptorSet, 0, nullptr);
+
+  return descriptorSet;
 }
 
 void createPipeline(Renderer &renderer, Scene *scene) {
@@ -505,7 +633,18 @@ std::vector<Model> createModels(Renderer &renderer) {
   return models;
 }
 
-Sky *createSky(Renderer &renderer) { return nullptr; }
+Sky *createSky(Renderer &renderer) {
+  VkDescriptorPool skyDescriptorPool = VK_NULL_HANDLE;
+  VkDescriptorSetLayout skyDescriptorSetLayout =
+      CreateSkyDescriptorSetLayout(renderer);
+
+  createSkyDescriptorPool(renderer, &skyDescriptorPool);
+
+  VkDescriptorSet skyDescriptorSet = VK_NULL_HANDLE;
+  // VkDescriptorSet skyDescriptorSet = CreateSkyDescriptorSet();
+
+  return nullptr;
+}
 
 Scene LoadScene(Renderer &renderer) {
   Scene scene;
