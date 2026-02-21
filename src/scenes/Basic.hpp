@@ -50,7 +50,7 @@ void createDescriptorSetLayout(Renderer &renderer, Scene *scene) {
 
   auto result =
       vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo,
-                                  nullptr, scene->descriptorSetLayout());
+                                  nullptr, scene->frameDescriptorSetLayout());
   if (result != VK_SUCCESS) {
     std::cerr << "vkCreateDescriptorSetLayout failed" << std::endl;
     std::abort();
@@ -60,9 +60,9 @@ void createDescriptorSetLayout(Renderer &renderer, Scene *scene) {
 void createDescriptorPool(Renderer &renderer, Scene *scene) {
   auto device = renderer.device();
 
-  auto descriptorSetLayout = scene->descriptorSetLayout();
-  auto descriptorPool = scene->descriptorPool();
-  auto descriptorSets = scene->descriptorSets();
+  auto descriptorSetLayout = scene->frameDescriptorSetLayout();
+  auto descriptorPool = scene->frameDescriptorPool();
+  auto descriptorSets = scene->frameDescriptorSets();
 
   VkDescriptorPoolSize descriptorPoolSize{};
   descriptorPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -105,7 +105,7 @@ void createPipeline(Renderer &renderer, Scene *scene) {
   auto pipelineLayout = scene->pipelineLayout();
   auto pipeline = scene->pipeline();
 
-  auto descriptorSetLayout = scene->descriptorSetLayout();
+  auto descriptorSetLayout = scene->frameDescriptorSetLayout();
 
   auto vertexDescriptor = basicVertexDescriptor();
 
@@ -321,7 +321,7 @@ void destroyPipeline(Renderer &renderer, Scene *scene) {
   auto pipelineLayout = scene->pipelineLayout();
   auto pipeline = scene->pipeline();
 
-  auto descriptorSetLayout = scene->descriptorSetLayout();
+  auto descriptorSetLayout = scene->frameDescriptorSetLayout();
 
   if (!device) {
     return;
@@ -346,7 +346,7 @@ void createUniformBuffers(Renderer &renderer, Scene *scene) {
   auto uboMemoryList = scene->uboMemoryList();
   auto uboMappedList = scene->uboMappedList();
 
-  auto descriptorSets = scene->descriptorSets();
+  auto descriptorSets = scene->frameDescriptorSets();
 
   for (int i = 0; i < FRAME_COUNT; ++i) {
     if (!CreateBuffer(renderer.physicalDevice(), device, sizeof(CameraUBO),
