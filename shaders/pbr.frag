@@ -107,7 +107,7 @@ void main() {
   color *= envIntensity;
 
   // --- Color correction / tonemapping ---
-  float exposure = 0.4;     0.4..1.2
+  float exposure = 0.4;
   color *= exposure;
 
   color = TonemapACES(color);
