@@ -28,67 +28,35 @@ VkDeviceMemory Mesh::indexMemory() { return m_indexMemory; }
 
 Material *Mesh::material() { return m_material; }
 
-void Mesh::clear(Renderer &renderer) {
-  // Clear resources...
+void Mesh::clear(Renderer &renderer, VkDescriptorPool descriptorPool) {
+  auto device = renderer.device();
+
+  if (!device) {
+    return;
+  }
 
   if (m_material != nullptr) {
+    m_material->clear(renderer, descriptorPool);
+
     free(m_material);
   }
+
+  if (m_vertexBuffer != VK_NULL_HANDLE) {
+    vkDestroyBuffer(device, m_vertexBuffer, nullptr);
+    m_vertexBuffer = VK_NULL_HANDLE;
+  }
+
+  if (m_vertexMemory != VK_NULL_HANDLE) {
+    vkFreeMemory(device, m_vertexMemory, nullptr);
+    m_vertexMemory = VK_NULL_HANDLE;
+  }
+
+  if (m_indexBuffer != VK_NULL_HANDLE) {
+    vkDestroyBuffer(device, m_indexBuffer, nullptr);
+    m_indexBuffer = VK_NULL_HANDLE;
+  }
+  if (m_indexMemory != VK_NULL_HANDLE) {
+    vkFreeMemory(device, m_indexMemory, nullptr);
+    m_indexMemory = VK_NULL_HANDLE;
+  }
 }
-
-// void Mesh::destroyResources(Renderer &renderer) {
-//   auto device = renderer.device();
-
-//   if (!device) {
-//     return;
-//   }
-
-//   // Mesh buffers
-//   if (m_vertexBuffer) {
-//     vkDestroyBuffer(device, m_vertexBuffer, nullptr);
-//     m_vertexBuffer = VK_NULL_HANDLE;
-//   }
-//   if (m_vertexMemory) {
-//     vkFreeMemory(device, m_vertexMemory, nullptr);
-//     m_vertexMemory = VK_NULL_HANDLE;
-//   }
-
-//   if (m_indexBuffer) {
-//     vkDestroyBuffer(device, m_indexBuffer, nullptr);
-//     m_indexBuffer = VK_NULL_HANDLE;
-//   }
-//   if (m_indexMemory) {
-//     vkFreeMemory(device, m_indexMemory, nullptr);
-//     m_indexMemory = VK_NULL_HANDLE;
-//   }
-
-//   // Uniform buffers (per-frame)
-//   for (int i = 0; i < FRAME_COUNT; ++i) {
-//     if (m_uboMappedList[i]) {
-//       vkUnmapMemory(device, m_uboMemoryList[i]);
-//       m_uboMappedList[i] = nullptr;
-//     }
-
-//     if (m_uboBufferList[i]) {
-//       vkDestroyBuffer(device, m_uboBufferList[i], nullptr);
-//       m_uboBufferList[i] = VK_NULL_HANDLE;
-//     }
-
-//     if (m_uboMemoryList[i]) {
-//       vkFreeMemory(device, m_uboMemoryList[i], nullptr);
-//       m_uboMemoryList[i] = VK_NULL_HANDLE;
-//     }
-//   }
-
-//   // Descriptor pool
-//   if (m_descriptorPool) {
-//     vkDestroyDescriptorPool(device, m_descriptorPool, nullptr);
-//     m_descriptorPool = VK_NULL_HANDLE;
-//   }
-
-//   // Descriptor set layout
-//   if (m_descriptorSetLayout) {
-//     vkDestroyDescriptorSetLayout(device, m_descriptorSetLayout, nullptr);
-//     m_descriptorSetLayout = VK_NULL_HANDLE;
-//   }
-// }

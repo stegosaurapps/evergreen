@@ -2,33 +2,23 @@
 
 #include <iostream>
 
-Engine::~Engine() { shutdown(); }
-
 bool Engine::init() {
-  // const int startW = 800;
-  // const int startH = 600;
-  const int startW = 1600;
-  const int startH = 1200;
+  const int width = 1920;
+  const int height = 1080;
 
-  if (!m_window.init("evergreen", startW, startH)) {
+  if (!m_window.init("evergreen", width, height)) {
     return false;
   }
 
-  auto wh = m_window.win32Handles();
-  if (!wh.hwnd || !wh.hinstance) {
+  auto windowHandle = m_window.win32Handles();
+  if (!windowHandle.hwnd || !windowHandle.hinstance) {
     std::cerr << "Engine: failed to get Win32 handles." << std::endl;
     return false;
   }
 
-  bool enableValidation =
-#if defined(_DEBUG)
-      true;
-#else
-      false;
-#endif
-  // bool enableValidation = true;
+  bool enableValidation = true;
 
-  if (!m_renderer.init(wh, startW, startH, enableValidation)) {
+  if (!m_renderer.init(windowHandle, width, height, enableValidation)) {
     std::cerr << "Engine: renderer init failed." << std::endl;
     return false;
   }
@@ -67,13 +57,13 @@ void Engine::tick() {
   m_previousTime = now;
 }
 
-void Engine::shutdown() {
+void Engine::clear() {
   // Scene depends on renderer.
-  m_scene.get()->shutdown(m_renderer);
+  m_scene.get()->clear(m_renderer);
 
   // Renderer depends on window.
-  m_renderer.shutdown();
+  m_renderer.clear();
 
   // Window is the last to go.
-  m_window.shutdown();
+  m_window.clear();
 }

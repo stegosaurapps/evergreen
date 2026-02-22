@@ -27,6 +27,8 @@ public:
   Texture &diffuseIrradiance();
   Texture &specularIrradiance();
 
+  void clear(Renderer &renderer);
+
 private:
   // Frame Descriptor
   VkDescriptorPool m_skyDescriptorPool = VK_NULL_HANDLE;

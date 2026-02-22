@@ -25,7 +25,7 @@ public:
 
   Material *material();
 
-  void clear(Renderer &renderer);
+  void clear(Renderer &renderer, VkDescriptorPool descriptorPool);
 
 private:
   uint32_t m_indexCount = 0;

@@ -24,14 +24,6 @@ unsigned long long VertexDescriptor::vertexStride() {
   return sizeAccumulator;
 }
 
-void VertexDescriptor::print() {
-  std::cout << "---------------------------" << std::endl;
-  for (VertexAttribute vertexAttribute : m_vertexAttributes) {
-    std::cout << "  " << AttributeName(vertexAttribute) << std::endl;
-  }
-  std::cout << "---------------------------" << std::endl;
-}
-
 std::vector<VertexAttribute> VertexDescriptor::vertexAttributes() {
   return m_vertexAttributes;
 }

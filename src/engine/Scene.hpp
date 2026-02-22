@@ -50,7 +50,7 @@ public:
 
   Sky *sky();
 
-  void shutdown(Renderer &renderer);
+  void clear(Renderer &renderer);
 
 private:
   Camera m_camera;

@@ -71,9 +71,6 @@ void Builder::generateMesh(Renderer &renderer) {
               (size_t)indexBufferSize);
   vkUnmapMemory(device, indexMemory);
 
-  std::cout << "vertices=" << vertexCount << " indices=" << indexCount
-            << std::endl;
-
   // clear vertex collector
   m_vertexCollector.clearVertices();
   m_vertexCollector.clearIndices();

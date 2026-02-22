@@ -17,7 +17,7 @@ public:
 
   std::vector<Mesh> &meshes();
 
-  void clear(Renderer &renderer);
+  void clear(Renderer &renderer, VkDescriptorPool descriptorPool);
 
 private:
   std::vector<Mesh> m_meshes;

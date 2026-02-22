@@ -23,7 +23,7 @@ void Scene::init(Renderer &renderer, Camera camera, std::vector<Model> models,
 }
 
 void Scene::update(Renderer &renderer, float deltaTime) {
-  // orbit update (camera owns orbit state)
+  // orbit update (camera owns orbit state).
   m_camera.orbitStep(deltaTime, 0.2);
 
   // Keep camera current (aspect updates on resize handled in onResize).
@@ -83,12 +83,59 @@ std::array<void *, FRAME_COUNT> *Scene::uboMappedList() {
   return &m_uboMappedList;
 }
 
-void Scene::shutdown(Renderer &renderer) {
-  for (auto model : m_models) {
-    model.clear(renderer);
+void Scene::clear(Renderer &renderer) {
+  auto device = renderer.device();
+
+  if (!device) {
+    return;
   }
 
-  // Clear resources...
+  for (auto model : m_models) {
+    model.clear(renderer, m_frameDescriptorPool);
+  }
 
-  m_destroyPipeline(renderer, this);
+  if (m_sky != nullptr) {
+    m_sky->clear(renderer);
+
+    free(m_sky);
+  }
+
+  for (size_t i = 0; i < FRAME_COUNT; ++i) {
+    if (m_uboMappedList[i]) {
+      vkUnmapMemory(device, m_uboMemoryList[i]);
+      m_uboMappedList[i] = nullptr;
+    }
+
+    if (m_uboBufferList[i] != VK_NULL_HANDLE) {
+      vkDestroyBuffer(device, m_uboBufferList[i], nullptr);
+      m_uboBufferList[i] = VK_NULL_HANDLE;
+    }
+
+    if (m_uboMemoryList[i] != VK_NULL_HANDLE) {
+      vkFreeMemory(device, m_uboMemoryList[i], nullptr);
+      m_uboMemoryList[i] = VK_NULL_HANDLE;
+    }
+  }
+
+  if (m_pipeline != VK_NULL_HANDLE) {
+    vkDestroyPipeline(device, m_pipeline, nullptr);
+    m_pipeline = VK_NULL_HANDLE;
+  }
+
+  if (m_pipelineLayout != VK_NULL_HANDLE) {
+    vkDestroyPipelineLayout(device, m_pipelineLayout, nullptr);
+    m_pipelineLayout = VK_NULL_HANDLE;
+  }
+
+  m_frameDescriptorSets.fill(VK_NULL_HANDLE);
+
+  if (m_frameDescriptorPool != VK_NULL_HANDLE) {
+    vkDestroyDescriptorPool(device, m_frameDescriptorPool, nullptr);
+    m_frameDescriptorPool = VK_NULL_HANDLE;
+  }
+
+  if (m_frameDescriptorSetLayout != VK_NULL_HANDLE) {
+    vkDestroyDescriptorSetLayout(device, m_frameDescriptorSetLayout, nullptr);
+    m_frameDescriptorSetLayout = VK_NULL_HANDLE;
+  }
 }

@@ -93,10 +93,10 @@ void createFrameDescriptorSetLayout(Renderer &renderer, Scene *scene) {
 void allocateFrameDescriptorSetLayout(Renderer &renderer, Scene *scene) {
   VkDevice device = renderer.device();
 
-  VkDescriptorPool *pool = scene->frameDescriptorPool();
+  VkDescriptorPool *descriptorPool = scene->frameDescriptorPool();
   VkDescriptorSetLayout *frameLayout = scene->frameDescriptorSetLayout();
 
-  auto *frameSets =
+  auto *descriptorSet =
       scene->frameDescriptorSets(); // std::array<VkDescriptorSet, FRAME_COUNT>
 
   // Allocate frame descriptor sets as before
@@ -105,14 +105,15 @@ void allocateFrameDescriptorSetLayout(Renderer &renderer, Scene *scene) {
     layouts[i] = *frameLayout;
   }
 
-  VkDescriptorSetAllocateInfo ai{
+  VkDescriptorSetAllocateInfo descriptorSetAllocateInfo{
       VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
-  ai.descriptorPool = *pool;
-  ai.descriptorSetCount = FRAME_COUNT;
-  ai.pSetLayouts = layouts.data();
+  descriptorSetAllocateInfo.descriptorPool = *descriptorPool;
+  descriptorSetAllocateInfo.descriptorSetCount = FRAME_COUNT;
+  descriptorSetAllocateInfo.pSetLayouts = layouts.data();
 
-  if (vkAllocateDescriptorSets(device, &ai, frameSets->data()) != VK_SUCCESS) {
-    std::cerr << "vkAllocateDescriptorSets (frame) failed\n";
+  if (vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo,
+                               descriptorSet->data()) != VK_SUCCESS) {
+    std::cerr << "vkAllocateDescriptorSets (frame) failed" << std::endl;
     std::abort();
   }
 }
@@ -149,7 +150,7 @@ VkDescriptorSetLayout createMaterialDescriptorSetLayout(Renderer &renderer) {
   VkDescriptorSetLayout materialSetLayout = VK_NULL_HANDLE;
   if (vkCreateDescriptorSetLayout(device, &ci, nullptr, &materialSetLayout) !=
       VK_SUCCESS) {
-    std::cerr << "Failed to create material set layout\n";
+    std::cerr << "Failed to create material set layout" << std::endl;
     std::abort();
   }
 
@@ -183,7 +184,8 @@ void createSkyDescriptorPool(Renderer &renderer,
 
   if (vkCreateDescriptorPool(device, &descriptorPoolCreateInfo, nullptr,
                              skyDescriptorPool) != VK_SUCCESS) {
-    std::cerr << "createSkyDescriptorPool: vkCreateDescriptorPool failed\n";
+    std::cerr << "createSkyDescriptorPool: vkCreateDescriptorPool failed"
+              << std::endl;
     std::abort();
   }
 }
@@ -335,7 +337,6 @@ void createPipeline(Renderer &renderer, Scene *scene) {
       CreateSkyDescriptorSetLayout(renderer);
 
   auto vertexDescriptor = basicVertexDescriptor();
-  PrintVertexDescriptor(&vertexDescriptor);
 
   // Destroy old pipeline + layout
   if (*pipeline) {
@@ -476,7 +477,8 @@ void createPipeline(Renderer &renderer, Scene *scene) {
       *frameDescriptorSetLayout == VK_NULL_HANDLE) {
     std::cerr
         << "createPipeline: frameDescriptorSetLayout set layout (set=0) is "
-           "VK_NULL_HANDLE\n";
+           "VK_NULL_HANDLE"
+        << std::endl;
     std::abort();
   }
 
@@ -635,11 +637,6 @@ std::vector<Model> createModels(Renderer &renderer) {
 }
 
 Texture LoadBRDFLutTexture(Renderer &renderer, const char *path) {
-  auto physicalDevice = renderer.physicalDevice();
-  auto device = renderer.device();
-  auto commandPool = renderer.commandPool();
-  auto graphicsQueue = renderer.grapicsQueue();
-
   std::vector<uint8_t> bytes;
   if (!ReadAllBytes(path, bytes)) {
     std::cerr << "Failed to ReadAllBytes for BRDF Lut Texture" << std::endl;
@@ -654,14 +651,12 @@ Texture LoadBRDFLutTexture(Renderer &renderer, const char *path) {
   }
 
   // BRDF LUT is LINEAR, not SRGB:
-  return CreateTextureFromRGBA8(physicalDevice, device, commandPool,
-                                graphicsQueue, rgba.data(), (uint32_t)width,
+  return CreateTextureFromRGBA8(renderer, rgba.data(), (uint32_t)width,
                                 (uint32_t)height, VK_FORMAT_R8G8B8A8_UNORM);
 }
 
-Texture LoadDiffuseIrradianceCubemap(Renderer &renderer, const char *dir) {
-  // Order MUST match whatever convention you use everywhere.
-  // Pick one and be consistent.
+Texture LoadDiffuseIrradianceCubemap(Renderer &renderer,
+                                     const char *directory) {
   const char *faceNames[6] = {
       "irradiance_diffuse_right.hdr", "irradiance_diffuse_left.hdr",
       "irradiance_diffuse_up.hdr",    "irradiance_diffuse_down.hdr",
@@ -669,12 +664,12 @@ Texture LoadDiffuseIrradianceCubemap(Renderer &renderer, const char *dir) {
   };
 
   std::vector<float> faceData[6];
-  int w = 0, h = 0;
+  int baseWidth = 0, baseHeight = 0;
 
   const float *facePtrs[6]{};
 
   for (int i = 0; i < 6; i++) {
-    std::string path = std::string(dir) + faceNames[i];
+    std::string path = std::string(directory) + faceNames[i];
     std::vector<uint8_t> bytes;
     if (!ReadAllBytes(path.c_str(), bytes)) {
       std::cerr << "Failed to ReadAllBytes for Diffuse Cubemap  Texture"
@@ -682,18 +677,18 @@ Texture LoadDiffuseIrradianceCubemap(Renderer &renderer, const char *dir) {
       std::abort();
     }
 
-    int fw = 0, fh = 0;
-    if (!DecodeToRGBA32F(bytes, faceData[i], fw, fh)) {
+    int width = 0, height = 0;
+    if (!DecodeToRGBA32F(bytes, faceData[i], width, height)) {
       std::cerr << "Failed to DecodeToRGBA32F for Diffuse Cubemap Texture"
                 << std::endl;
       std::abort();
     }
 
     if (i == 0) {
-      w = fw;
-      h = fh;
+      baseWidth = width;
+      baseHeight = height;
     }
-    if (fw != w || fh != h) {
+    if (width != baseWidth || height != baseHeight) {
       std::cerr << "Diffuse irradiance faces are not same size" << std::endl;
       std::abort();
     }
@@ -701,47 +696,45 @@ Texture LoadDiffuseIrradianceCubemap(Renderer &renderer, const char *dir) {
     facePtrs[i] = faceData[i].data();
   }
 
-  // simplest format first (works everywhere): R32G32B32A32_SFLOAT
-  // then later you can optimize to R16G16B16A16_SFLOAT
-  return CreateCubemapFromRGBA32F(renderer, facePtrs, (uint32_t)w, (uint32_t)h,
-                                  /*mipLevels=*/1,
+  return CreateCubemapFromRGBA32F(renderer, facePtrs, (uint32_t)baseWidth,
+                                  (uint32_t)baseHeight, 1,
                                   VK_FORMAT_R32G32B32A32_SFLOAT);
 }
 
-Texture LoadSpecularIrradianceCubemap(Renderer &renderer, const char *dir,
+Texture LoadSpecularIrradianceCubemap(Renderer &renderer, const char *directory,
                                       uint32_t levels) {
   const char *faces[6] = {"right", "left", "up", "down", "front", "back"};
 
   std::vector<std::vector<float>> decoded(levels * 6);
   std::vector<std::array<const float *, 6>> ptr(levels);
 
-  uint32_t baseW = 0, baseH = 0;
+  uint32_t baseWidth = 0, baseHeight = 0;
 
   for (uint32_t lvl = 0; lvl < levels; ++lvl) {
     for (uint32_t f = 0; f < 6; ++f) {
-      std::string path = std::string(dir) + "irradiance_specular_" +
+      std::string path = std::string(directory) + "irradiance_specular_" +
                          std::to_string(lvl) + "_" + faces[f] + ".hdr";
 
       std::vector<uint8_t> bytes;
       if (!ReadAllBytes(path.c_str(), bytes)) {
-        std::cerr << "Missing " << path << "\n";
+        std::cerr << "Missing " << path << std::endl;
         std::abort();
       }
 
-      int w = 0, h = 0;
-      if (!DecodeToRGBA32F(bytes, decoded[lvl * 6 + f], w, h)) {
-        std::cerr << "Decode failed " << path << "\n";
+      int width = 0, height = 0;
+      if (!DecodeToRGBA32F(bytes, decoded[lvl * 6 + f], width, height)) {
+        std::cerr << "Decode failed " << path << std::endl;
         std::abort();
       }
 
       if (lvl == 0 && f == 0) {
-        baseW = (uint32_t)w;
-        baseH = (uint32_t)h;
+        baseWidth = (uint32_t)width;
+        baseHeight = (uint32_t)height;
       }
-      if ((uint32_t)w != baseW || (uint32_t)h != baseH) {
+      if ((uint32_t)width != baseWidth || (uint32_t)height != baseHeight) {
         std::cerr << "Specular levels must all be same size for cube array. "
-                  << path << " got " << w << "x" << h << " expected " << baseW
-                  << "x" << baseH << "\n";
+                  << path << " got " << width << "x" << height << " expected "
+                  << baseWidth << "x" << baseHeight << std::endl;
         std::abort();
       }
 
@@ -752,7 +745,8 @@ Texture LoadSpecularIrradianceCubemap(Renderer &renderer, const char *dir,
   // Bridge to expected signature pixels[level][6]
   const float *(*pixels)[6] = (const float *(*)[6])ptr.data();
 
-  return CreateCubemapArrayFromRGBA32F(renderer, pixels, levels, baseW, baseH,
+  return CreateCubemapArrayFromRGBA32F(renderer, pixels, levels, baseWidth,
+                                       baseHeight,
                                        VK_FORMAT_R32G32B32A32_SFLOAT);
 }
 

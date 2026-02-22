@@ -51,9 +51,8 @@ static Texture LoadCgltfImageAsTexture(Renderer &renderer,
     std::abort();
   }
 
-  return CreateTextureFromRGBA8(renderer.physicalDevice(), renderer.device(),
-                                renderer.commandPool(), renderer.grapicsQueue(),
-                                rgba.data(), (uint32_t)w, (uint32_t)h, format);
+  return CreateTextureFromRGBA8(renderer, rgba.data(), (uint32_t)w, (uint32_t)h,
+                                format);
 }
 
 static const cgltf_image *
@@ -65,9 +64,9 @@ static VkDescriptorSet CreateMaterialDescriptorSet(
     Renderer &renderer, VkDescriptorSetLayout materialSetLayout,
     Texture &albedo, Texture &metalRough, Texture &normal) {
   VkDevice device = renderer.device();
-  VkDescriptorPool pool = renderer.materialDescriptorPool();
+  VkDescriptorPool descriptorPool = renderer.materialDescriptorPool();
 
-  if (pool == VK_NULL_HANDLE) {
+  if (descriptorPool == VK_NULL_HANDLE) {
     std::cerr << "CreateMaterialDescriptorSet: "
                  "renderer.materialDescriptorPool() is VK_NULL_HANDLE"
               << std::endl;
@@ -82,7 +81,7 @@ static VkDescriptorSet CreateMaterialDescriptorSet(
 
   VkDescriptorSetAllocateInfo descriptorSetAllocateInfo{
       VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
-  descriptorSetAllocateInfo.descriptorPool = pool;
+  descriptorSetAllocateInfo.descriptorPool = descriptorPool;
   descriptorSetAllocateInfo.descriptorSetCount = 1;
   descriptorSetAllocateInfo.pSetLayouts = &materialSetLayout;
 
@@ -188,30 +187,30 @@ static const cgltf_accessor *FindAttr(const cgltf_primitive &prim,
                                       cgltf_attribute_type type,
                                       int index = 0) {
   for (cgltf_size i = 0; i < prim.attributes_count; i++) {
-    const cgltf_attribute &a = prim.attributes[i];
-    if (a.type == type && a.index == index) {
-      return a.data;
+    const cgltf_attribute &attribute = prim.attributes[i];
+    if (attribute.type == type && attribute.index == index) {
+      return attribute.data;
     }
   }
   return nullptr;
 }
 
 // Read indices as uint32_t (cgltf handles component type conversion)
-static void ReadIndicesU32(const cgltf_accessor *acc,
+static void ReadIndicesU32(const cgltf_accessor *accessor,
                            std::vector<uint32_t> &out) {
-  out.resize(acc->count);
-  for (cgltf_size i = 0; i < acc->count; i++) {
-    out[i] = (uint32_t)cgltf_accessor_read_index(acc, i);
+  out.resize(accessor->count);
+  for (cgltf_size i = 0; i < accessor->count; i++) {
+    out[i] = (uint32_t)cgltf_accessor_read_index(accessor, i);
   }
 }
 
 // Read float vectors (cgltf converts normalized ints etc. to float for you)
-static void ReadFloatN(const cgltf_accessor *acc, cgltf_size i, float *dst,
+static void ReadFloatN(const cgltf_accessor *accessor, cgltf_size i, float *dst,
                        int n) {
   for (int k = 0; k < n; k++) {
     dst[k] = 0.0f;
   }
-  cgltf_accessor_read_float(acc, i, dst, n);
+  cgltf_accessor_read_float(accessor, i, dst, n);
 }
 
 static bool ExtractPrimitiveCPU(const cgltf_primitive &prim,
@@ -341,11 +340,12 @@ Model loadModel(Renderer &renderer, VertexDescriptor vertexDescriptor,
     std::abort();
   }
 
-  for (cgltf_size mi = 0; mi < data->meshes_count; mi++) {
-    const cgltf_mesh &mesh = data->meshes[mi];
+  for (cgltf_size meshIndex = 0; meshIndex < data->meshes_count; meshIndex++) {
+    const cgltf_mesh &mesh = data->meshes[meshIndex];
 
-    for (cgltf_size pi = 0; pi < mesh.primitives_count; pi++) {
-      const cgltf_primitive &primitive = mesh.primitives[pi];
+    for (cgltf_size primitiveIndex = 0; primitiveIndex < mesh.primitives_count;
+         primitiveIndex++) {
+      const cgltf_primitive &primitive = mesh.primitives[primitiveIndex];
 
       std::vector<Vertex> vertices;
       std::vector<uint32_t> indices;

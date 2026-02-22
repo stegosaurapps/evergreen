@@ -9,7 +9,7 @@
 class Engine {
 public:
   Engine() = default;
-  ~Engine();
+  ~Engine() = default;
 
   Engine(const Engine &) = delete;
   Engine &operator=(const Engine &) = delete;
@@ -19,13 +19,13 @@ public:
   void loadScene(Scene scene) { m_scene = std::make_unique<Scene>(scene); };
   void run();
 
-  void shutdown();
-
   float deltaTime() { return m_deltaTime; };
 
   Window &window() { return m_window; };
   Renderer &renderer() { return m_renderer; };
   Scene *scene() { return m_scene.get(); };
+
+  void clear();
 
 private:
   uint64_t m_previousTime = 0;

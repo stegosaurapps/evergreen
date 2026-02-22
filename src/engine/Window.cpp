@@ -2,8 +2,6 @@
 
 #include <iostream>
 
-Window::~Window() { shutdown(); }
-
 bool Window::init(const char *title, int width, int height) {
   if (!SDL_Init(SDL_INIT_VIDEO)) {
     std::cerr << "SDL_Init failed: " << SDL_GetError() << std::endl;
@@ -25,7 +23,7 @@ bool Window::init(const char *title, int width, int height) {
   return true;
 }
 
-void Window::shutdown() {
+void Window::clear() {
   if (m_window) {
     SDL_DestroyWindow(m_window);
     m_window = nullptr;

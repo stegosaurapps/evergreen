@@ -7,6 +7,8 @@
 #include <memory>
 #include <vector>
 
+class Renderer; // forward declaration
+
 class Material {
 public:
   Material() = default;
@@ -17,7 +19,7 @@ public:
 
   VkDescriptorSet *descriptorSet();
 
-  void clear();
+  void clear(Renderer &renderer, VkDescriptorPool descriptorPool);
 
 private:
   VkDescriptorSet m_descriptorSet = VK_NULL_HANDLE;

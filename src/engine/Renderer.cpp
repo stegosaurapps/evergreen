@@ -150,7 +150,7 @@ void Renderer::drawFrame(Scene *scene) {
   m_frameIndex = (m_frameIndex + 1) % FRAME_COUNT;
 }
 
-void Renderer::shutdown() {
+void Renderer::clear() {
   if (!m_device && !m_instance) {
     return; // already down
   }
@@ -174,24 +174,24 @@ void Renderer::shutdown() {
     m_inFlight[i] = VK_NULL_HANDLE;
   }
 
-  if (m_commandPool) {
+  if (m_commandPool != VK_NULL_HANDLE) {
     vkDestroyCommandPool(m_device, m_commandPool, nullptr);
     m_commandPool = VK_NULL_HANDLE;
   }
 
-  if (m_materialDescriptorPool) {
+  if (m_materialDescriptorPool != VK_NULL_HANDLE) {
     vkDestroyDescriptorPool(m_device, m_materialDescriptorPool, nullptr);
     m_materialDescriptorPool = VK_NULL_HANDLE;
   }
 
   destroySwapchain();
 
-  if (m_device) {
+  if (m_device != VK_NULL_HANDLE) {
     vkDestroyDevice(m_device, nullptr);
     m_device = VK_NULL_HANDLE;
   }
 
-  if (m_surface) {
+  if (m_surface != VK_NULL_HANDLE) {
     vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
     m_surface = VK_NULL_HANDLE;
   }
@@ -207,7 +207,7 @@ void Renderer::shutdown() {
     m_debugMessenger = VK_NULL_HANDLE;
   }
 
-  if (m_instance) {
+  if (m_instance != VK_NULL_HANDLE) {
     vkDestroyInstance(m_instance, nullptr);
     m_instance = VK_NULL_HANDLE;
   }
@@ -474,6 +474,7 @@ void Renderer::createDevice() {
   const std::vector<const char *> devExts = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
   VkPhysicalDeviceFeatures physicalDeviceFeatures{};
+  physicalDeviceFeatures.imageCubeArray = VK_TRUE;
 
   VkDeviceCreateInfo deviceCreateInfo{};
   deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;

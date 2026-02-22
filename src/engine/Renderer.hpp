@@ -37,7 +37,7 @@ public:
   void update(float deltaTime);
   void drawFrame(Scene *scene);
 
-  void shutdown();
+  void clear();
 
 private:
   bool m_enableValidation = false;

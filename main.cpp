@@ -10,9 +10,14 @@ int main(int, char**) {
         return 1;
     }
 
+    // Dynamically load a scene to render.
     engine.loadScene(LoadScene(engine.renderer()));
 
+    // The main loop will run until program is ready to close.
     engine.run();
+
+    // Trigger all cleanup.
+    engine.clear();
 
     return 0;
 }

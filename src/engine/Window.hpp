@@ -15,13 +15,13 @@
 class Window {
 public:
   Window() = default;
-  ~Window();
+  ~Window() = default;
 
   Window(const Window &) = delete;
   Window &operator=(const Window &) = delete;
 
   bool init(const char *title, int width, int height);
-  void shutdown();
+  void clear();
 
   // Pump all queued events; returns false if app should quit.
   bool pumpEvents();

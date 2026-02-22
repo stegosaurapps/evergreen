@@ -4,6 +4,8 @@
 
 #include <vector>
 
+class Renderer; // forward declaration
+
 class Texture {
 public:
   Texture() = default;
@@ -17,7 +19,7 @@ public:
   VkImageView view();
   VkSampler sampler();
 
-  void clear();
+  void clear(Renderer &renderer);
 
 private:
   uint32_t m_width = 0;
